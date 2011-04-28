@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
+
 import subprocess
 import os
 import sys
 import re
-
-mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', 'minecraft_server.jar', 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+import queue
+
 
 def html_filter(in_txt):
     filtered = in_txt.replace('&', '&amp;')
@@ -68,9 +70,6 @@ def run_server():
     httpd = GoodServer(server_address, GoodHandler)
     httpd.serve_forever()
 
-import queue
-text_queue = queue.Queue()
-
 def run_read_text():
     while True:
         full_line = mcserver.stdout.readline()
@@ -82,19 +81,17 @@ def run_input():
         line = input()
         put_text(line)
 
-import threading
+
+text_queue = queue.Queue()
 
 server_thread = threading.Thread(target=run_server, name="serve")
 server_thread.daemon = True
-server_thread.start()
 
 read_thread = threading.Thread(target=run_read_text, name="read")
 read_thread.daemon = True
-read_thread.start()
 
 input_thread = threading.Thread(target=run_input, name="input")
-input_thread .daemon = True
-input_thread .start()
+input_thread.daemon = True
 
 onliners = set()
 chat_msgs = []
@@ -174,15 +171,25 @@ def put_text(text):
     mcserver.stdin.write(bytes(text+'\n', 'utf8'))
     mcserver.stdin.flush()
 
+def main():
+    global mcserver
+    mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', 'minecraft_server.jar', 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-# main loop
-while True:
+    server_thread.start()
+    read_thread.start()
+    input_thread.start()
+
+    # main loop
     try:
-        line = text_queue.get()
+        while True:
+            line = text_queue.get()
+            got_text(line)
     except KeyboardInterrupt:
         print("shutting down")
         httpd.shutdown()
         put_text("stop")
-        break
 
-    got_text(line)
+
+if __name__ == "__main__":
+    main()
+
