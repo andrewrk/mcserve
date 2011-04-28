@@ -73,7 +73,7 @@ def run_server():
 def run_read_text():
     while True:
         full_line = mcserver.stdout.readline()
-        line = full_line.strip()
+        line = full_line.rstrip()
         text_queue.put(line.decode('utf8'))
 
 def run_input():
