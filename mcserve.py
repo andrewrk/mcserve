@@ -54,15 +54,32 @@ Content-type: text/html
             self.wfile.write(bytes("<p>Nobody is online :-(</p>", 'utf8'))
 
         self.wfile.write(bytes("<h2>latest gibberish</h2>", 'utf8'))
-        for date, name, msg in chat_msgs:
-            self.wfile.write(bytes("{0} &lt;{1}&gt; {2} <br/>".format(html_filter(date), html_filter(name), html_filter(msg)), 'utf8'))
-
-
+        for message in messages:
+            self.wfile.write(bytes(message.html(), 'utf8'))
 
         self.wfile.write(bytes("""
 </body>
 </html>
 """, 'utf8'))
+
+class ChatMessage:
+    def __init__(self, date, name, msg):
+        self.date = date
+        self.name = name
+        self.msg = msg
+    def html(self):
+        return "{0} &lt;{1}&gt; {2}<br/>".format(html_filter(self.date), html_filter(self.name), html_filter(self.msg))
+class JoinLeftMessage:
+    def __init__(self, date, name, joined=True):
+        self.date = date
+        self.name = name
+        self.joined = joined
+    def html(self):
+        if self.joined:
+            joined_left_html = "joined"
+        else:
+            joined_left_html = "left"
+        return "{} {} {}<br/>".format(html_filter(self.date), html_filter(self.name), joined_left_html)
 
 def run_server():
     global httpd
@@ -71,10 +88,11 @@ def run_server():
     httpd.serve_forever()
 
 def run_read_text():
-    while True:
-        full_line = mcserver.stdout.readline()
+    for full_line in mcserver.stdout:
         line = full_line.rstrip()
         text_queue.put(line.decode('utf8'))
+    else:
+        text_queue.put(None) # shutdown somehow
 
 def run_input():
     try:
@@ -97,7 +115,22 @@ input_thread = threading.Thread(target=run_input, name="input")
 input_thread.daemon = True
 
 onliners = set()
-chat_msgs = []
+messages = []
+
+def user_joined(date, name):
+    onliners.add(name)
+    add_message(JoinLeftMessage(date, name, joined=True))
+def user_left(date, name):
+    try:
+        onliners.remove(name)
+    except KeyError:
+        return
+    add_message(JoinLeftMessage(date, name, joined=False))
+
+def add_message(message):
+    messages.append(message)
+    if len(messages) > 100:
+        messages.pop(0)
 
 login_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+) \[\/(\d+\.\d+.\d+.\d+:\d+)\] logged in with entity id (\d+?) at \(.+?\)$')
 logout_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) lost connection: (.+)$')
@@ -109,57 +142,50 @@ nonop_command_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) tr
 def got_text(text):
     print("[out] {0}".format(text))
 
-    groups = login_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        onliners.add(name)
+    match = login_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        user_joined(date, name)
         print("{0} logged in".format(name))
-    groups = logout_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = logout_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        user_left(date, name)
         print("{0} logged out".format(name))
-    groups = kicked_float_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        why = groups.group(3)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = kicked_float_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        why = match.group(3)
+        user_left(date, name)
         print("{0} kicked for {1}".format(name, why))
-    groups = kicked_op_re.match(text)
-    if groups is not None:
-        kicker = groups.group(1)
-        name = groups.group(2)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = kicked_op_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        kicker = match.group(2)
+        name = match.group(3)
+        user_left(date, name)
         print("{0} kicked by {1}".format(name, kicker))
 
-    groups = chat_re.match(text)
-    if groups is not None:
-        date = groups.group(1)
-        name = groups.group(2)
-        msg = groups.group(3)
-        chat_msgs.append((date, name, msg))
-        if len(chat_msgs) > 100:
-            chat_msgs.pop(0)
+    match = chat_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        msg = match.group(3)
+        add_message(ChatMessage(date, name, msg))
 
-    groups = op_command_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        cmd = groups.group(3)
+    match = op_command_re.match(text)
+    if match is not None:
+        name = match.group(2)
+        cmd = match.group(3)
         try_cmd(name, cmd, op=True)
 
-    groups = nonop_command_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        cmd = groups.group(3)
+    match = nonop_command_re.match(text)
+    if match is not None:
+        name = match.group(2)
+        cmd = match.group(3)
         try_cmd(name, cmd, op=False)
 
 def try_cmd(name, cmd, op=False):
