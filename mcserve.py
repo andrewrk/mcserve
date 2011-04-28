@@ -9,12 +9,14 @@ import optparse
 
 __version__ = "0.0"
 
-def html_filter(in_txt):
-    filtered = in_txt.replace('&', '&amp;')
-    filtered = filtered.replace('"', '&quot;')
-    filtered = filtered.replace('<', '&lt;')
-    filtered = filtered.replace('>', '&gt;')
-    return filtered
+def html_filter(text, color=None):
+    text = text.replace('&', '&amp;')
+    text = text.replace('"', '&quot;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+    if color != None:
+        text = "<span style=\"color:" + color + "\">" + text + "</span>"
+    return text
 
 class GoodServer(HTTPServer):
     def __init__(self, server_address, handler):
@@ -62,13 +64,18 @@ Content-type: text/html
 </html>
 """, 'utf8'))
 
+gray_color = "#808080"
+def color_from_name(name):
+    name_hash = hash(name)
+    color = name_hash & 0xa0a0a0
+    return "#" + hex(color)[2:].zfill(6)
 class ChatMessage:
     def __init__(self, date, name, msg):
         self.date = date
         self.name = name
         self.msg = msg
     def html(self):
-        return "{0} &lt;{1}&gt; {2}<br/>".format(html_filter(self.date), html_filter(self.name), html_filter(self.msg))
+        return "{} &lt;{}&gt; {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), html_filter(self.msg))
 class JoinLeftMessage:
     def __init__(self, date, name, joined=True):
         self.date = date
@@ -79,7 +86,7 @@ class JoinLeftMessage:
             joined_left_html = "joined"
         else:
             joined_left_html = "left"
-        return "{} {} {}<br/>".format(html_filter(self.date), html_filter(self.name), joined_left_html)
+        return "{} {} {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), joined_left_html)
 
 def run_server():
     global httpd
