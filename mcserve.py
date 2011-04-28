@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import subprocess
-import os
-import sys
+import sys, os, subprocess
 import re
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import queue
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import optparse
 
+__version__ = "0.0"
 
 def html_filter(in_txt):
     filtered = in_txt.replace('&', '&amp;')
@@ -171,9 +171,9 @@ def put_text(text):
     mcserver.stdin.write(bytes(text+'\n', 'utf8'))
     mcserver.stdin.flush()
 
-def main():
+def main(server_jar_path):
     global mcserver
-    mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', 'minecraft_server.jar', 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+    mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', server_jar_path, 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     server_thread.start()
     read_thread.start()
@@ -191,5 +191,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = optparse.OptionParser(version=__version__)
+    (options, args) = parser.parse_args()
+    if len(args) == 0:
+        server_jar_path = 'minecraft_server.jar'
+    else:
+        server_jar_path = args[0]
+
+    main(server_jar_path)
 
