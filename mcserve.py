@@ -2,7 +2,7 @@
 
 import sys, os, subprocess
 import re
-import threading
+import time, threading
 import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import optparse
@@ -77,9 +77,12 @@ def run_read_text():
         text_queue.put(line.decode('utf8'))
 
 def run_input():
-    while True:
-        line = input()
-        put_text(line)
+    try:
+        while True:
+            line = input()
+            put_text(line)
+    except EOFError:
+        text_queue.put(None)
 
 
 text_queue = queue.Queue()
@@ -183,11 +186,23 @@ def main(server_jar_path):
     try:
         while True:
             line = text_queue.get()
+            if line == None:
+                break # eof
             got_text(line)
     except KeyboardInterrupt:
-        print("shutting down")
-        httpd.shutdown()
-        put_text("stop")
+        pass
+    print("shutting down")
+    httpd.shutdown()
+    put_text("stop")
+    # wait a little for minecraft to shutdown
+    poll_interval = 0.1
+    for _ in range(int(5 / poll_interval)):
+        if mcserver.poll() != None:
+            break # done
+        time.sleep(poll_interval)
+    else:
+        # too long to wait. send a ctrl+c in case we didn't already.
+        mcserver.terminate()
 
 
 if __name__ == "__main__":
