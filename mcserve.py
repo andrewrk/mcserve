@@ -86,7 +86,7 @@ class JoinLeftMessage:
             joined_left_html = "joined"
         else:
             joined_left_html = "left"
-        return "{} {} {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), joined_left_html)
+        return "*{} {} {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), joined_left_html)
 
 def run_server():
     global httpd
