@@ -1,18 +1,22 @@
-import subprocess
-import os
-import sys
+#!/usr/bin/env python3
+
+import sys, os, subprocess
 import re
-
-mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', 'minecraft_server.jar', 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-
+import time, threading
+import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import optparse
 
-def html_filter(in_txt):
-    filtered = in_txt.replace('&', '&amp;')
-    filtered = filtered.replace('"', '&quot;')
-    filtered = filtered.replace('<', '&lt;')
-    filtered = filtered.replace('>', '&gt;')
-    return filtered
+__version__ = "0.0"
+
+def html_filter(text, color=None):
+    text = text.replace('&', '&amp;')
+    text = text.replace('"', '&quot;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+    if color != None:
+        text = "<span style=\"color:" + color + "\">" + text + "</span>"
+    return text
 
 class GoodServer(HTTPServer):
     def __init__(self, server_address, handler):
@@ -52,15 +56,37 @@ Content-type: text/html
             self.wfile.write(bytes("<p>Nobody is online :-(</p>", 'utf8'))
 
         self.wfile.write(bytes("<h2>latest gibberish</h2>", 'utf8'))
-        for date, name, msg in chat_msgs:
-            self.wfile.write(bytes("{0} &lt;{1}&gt; {2} <br/>".format(html_filter(date), html_filter(name), html_filter(msg)), 'utf8'))
-
-
+        for message in messages:
+            self.wfile.write(bytes(message.html(), 'utf8'))
 
         self.wfile.write(bytes("""
 </body>
 </html>
 """, 'utf8'))
+
+gray_color = "#808080"
+def color_from_name(name):
+    name_hash = hash(name)
+    color = name_hash & 0xa0a0a0
+    return "#" + hex(color)[2:].zfill(6)
+class ChatMessage:
+    def __init__(self, date, name, msg):
+        self.date = date
+        self.name = name
+        self.msg = msg
+    def html(self):
+        return "{} &lt;{}&gt; {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), html_filter(self.msg))
+class JoinLeftMessage:
+    def __init__(self, date, name, joined=True):
+        self.date = date
+        self.name = name
+        self.joined = joined
+    def html(self):
+        if self.joined:
+            joined_left_html = "joined"
+        else:
+            joined_left_html = "left"
+        return "{} {} {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), joined_left_html)
 
 def run_server():
     global httpd
@@ -68,36 +94,50 @@ def run_server():
     httpd = GoodServer(server_address, GoodHandler)
     httpd.serve_forever()
 
-import queue
-text_queue = queue.Queue()
-
 def run_read_text():
-    while True:
-        full_line = mcserver.stdout.readline()
-        line = full_line.strip()
+    for full_line in mcserver.stdout:
+        line = full_line.rstrip()
         text_queue.put(line.decode('utf8'))
+    else:
+        text_queue.put(None) # shutdown somehow
 
 def run_input():
-    while True:
-        line = input()
-        put_text(line)
+    try:
+        while True:
+            line = input()
+            put_text(line)
+    except EOFError:
+        text_queue.put(None)
 
-import threading
+
+text_queue = queue.Queue()
 
 server_thread = threading.Thread(target=run_server, name="serve")
 server_thread.daemon = True
-server_thread.start()
 
 read_thread = threading.Thread(target=run_read_text, name="read")
 read_thread.daemon = True
-read_thread.start()
 
 input_thread = threading.Thread(target=run_input, name="input")
-input_thread .daemon = True
-input_thread .start()
+input_thread.daemon = True
 
 onliners = set()
-chat_msgs = []
+messages = []
+
+def user_joined(date, name):
+    onliners.add(name)
+    add_message(JoinLeftMessage(date, name, joined=True))
+def user_left(date, name):
+    try:
+        onliners.remove(name)
+    except KeyError:
+        return
+    add_message(JoinLeftMessage(date, name, joined=False))
+
+def add_message(message):
+    messages.append(message)
+    if len(messages) > 100:
+        messages.pop(0)
 
 login_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+) \[\/(\d+\.\d+.\d+.\d+:\d+)\] logged in with entity id (\d+?) at \(.+?\)$')
 logout_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) lost connection: (.+)$')
@@ -109,57 +149,50 @@ nonop_command_re = re.compile(r'^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) tr
 def got_text(text):
     print("[out] {0}".format(text))
 
-    groups = login_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        onliners.add(name)
+    match = login_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        user_joined(date, name)
         print("{0} logged in".format(name))
-    groups = logout_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = logout_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        user_left(date, name)
         print("{0} logged out".format(name))
-    groups = kicked_float_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        why = groups.group(3)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = kicked_float_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        why = match.group(3)
+        user_left(date, name)
         print("{0} kicked for {1}".format(name, why))
-    groups = kicked_op_re.match(text)
-    if groups is not None:
-        kicker = groups.group(1)
-        name = groups.group(2)
-        try:
-            onliners.remove(name)
-        except KeyError:
-            pass
+    match = kicked_op_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        kicker = match.group(2)
+        name = match.group(3)
+        user_left(date, name)
         print("{0} kicked by {1}".format(name, kicker))
 
-    groups = chat_re.match(text)
-    if groups is not None:
-        date = groups.group(1)
-        name = groups.group(2)
-        msg = groups.group(3)
-        chat_msgs.append((date, name, msg))
-        if len(chat_msgs) > 100:
-            chat_msgs.pop(0)
+    match = chat_re.match(text)
+    if match is not None:
+        date = match.group(1)
+        name = match.group(2)
+        msg = match.group(3)
+        add_message(ChatMessage(date, name, msg))
 
-    groups = op_command_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        cmd = groups.group(3)
+    match = op_command_re.match(text)
+    if match is not None:
+        name = match.group(2)
+        cmd = match.group(3)
         try_cmd(name, cmd, op=True)
 
-    groups = nonop_command_re.match(text)
-    if groups is not None:
-        name = groups.group(2)
-        cmd = groups.group(3)
+    match = nonop_command_re.match(text)
+    if match is not None:
+        name = match.group(2)
+        cmd = match.group(3)
         try_cmd(name, cmd, op=False)
 
 def try_cmd(name, cmd, op=False):
@@ -174,15 +207,44 @@ def put_text(text):
     mcserver.stdin.write(bytes(text+'\n', 'utf8'))
     mcserver.stdin.flush()
 
+def main(server_jar_path):
+    global mcserver
+    mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', server_jar_path, 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-# main loop
-while True:
+    server_thread.start()
+    read_thread.start()
+    input_thread.start()
+
+    # main loop
     try:
-        line = text_queue.get()
+        while True:
+            line = text_queue.get()
+            if line == None:
+                break # eof
+            got_text(line)
     except KeyboardInterrupt:
-        print("shutting down")
-        httpd.shutdown()
-        put_text("stop")
-        break
+        pass
+    print("shutting down")
+    httpd.shutdown()
+    put_text("stop")
+    # wait a little for minecraft to shutdown
+    poll_interval = 0.1
+    for _ in range(int(5 / poll_interval)):
+        if mcserver.poll() != None:
+            break # done
+        time.sleep(poll_interval)
+    else:
+        # too long to wait. send a ctrl+c in case we didn't already.
+        mcserver.terminate()
 
-    got_text(line)
+
+if __name__ == "__main__":
+    parser = optparse.OptionParser(version=__version__)
+    (options, args) = parser.parse_args()
+    if len(args) == 0:
+        server_jar_path = 'minecraft_server.jar'
+    else:
+        server_jar_path = args[0]
+
+    main(server_jar_path)
+

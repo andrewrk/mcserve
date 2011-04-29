@@ -1,0 +1,6 @@
+python3 http server and console wrapper for minecraft server.
+
+Supports minecraft_server.jar version Beta 1.5_02 at least.
+
+Http server defaults to port 9999. Provides an html page that lists online users and recent chat activity.
+
