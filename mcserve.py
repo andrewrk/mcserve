@@ -56,7 +56,7 @@ Content-type: text/html
             self.wfile.write(bytes("<p>Nobody is online :-(</p>", 'utf8'))
 
         self.wfile.write(bytes("<h2>latest gibberish</h2>", 'utf8'))
-        for message in messages:
+        for message in reversed(messages):
             self.wfile.write(bytes(message.html(), 'utf8'))
 
         self.wfile.write(bytes("""
