@@ -49,7 +49,7 @@ Content-type: text/html
         if len(onliners) > 0:
             self.wfile.write(bytes("<h2>Online players:</h2><ul>", 'utf8'))
             for onliner in onliners:
-                self.wfile.write(bytes("<li>{0}</li>".format(html_filter(onliner)), 'utf8'))
+                self.wfile.write(bytes("<li>{}</li>".format(html_filter(onliner, color_from_name(onliner))), 'utf8'))
 
             self.wfile.write(bytes("</ul>", 'utf8'))
         else:
