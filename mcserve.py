@@ -2,7 +2,7 @@
 
 import sys, os, subprocess
 import re
-import time, threading
+import time, datetime, threading
 import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import optparse
@@ -69,24 +69,42 @@ def color_from_name(name):
     name_hash = hash(name)
     color = name_hash & 0xa0a0a0
     return "#" + hex(color)[2:].zfill(6)
-class ChatMessage:
-    def __init__(self, date, name, msg):
-        self.date = date
+def date_header_html(date):
+    return html_filter(date.strftime("%Y-%m-%d %H:%M:%S"), gray_color)
+class Message:
+    def __init__(self):
+        self.date = datetime.datetime.now()
+    def html(self):
+        return "{} {}<br/>".format(date_header_html(self.date), self.html_content())
+class ChatMessage(Message):
+    def __init__(self, name, msg):
+        super().__init__()
         self.name = name
         self.msg = msg
-    def html(self):
-        return "{} &lt;{}&gt; {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), html_filter(self.msg))
-class JoinLeftMessage:
-    def __init__(self, date, name, joined=True):
-        self.date = date
+    def html_content(self):
+        return "&lt;{}&gt; {}".format(html_filter(self.name, color_from_name(self.name)), html_filter(self.msg))
+class JoinLeftMessage(Message):
+    def __init__(self, name, joined=True):
+        super().__init__()
         self.name = name
         self.joined = joined
-    def html(self):
+    def html_content(self):
         if self.joined:
             joined_left_html = "joined"
         else:
             joined_left_html = "left"
-        return "{} *{} {}<br/>".format(html_filter(self.date, gray_color), html_filter(self.name, color_from_name(self.name)), joined_left_html)
+        return "*{} {}".format(html_filter(self.name, color_from_name(self.name)), joined_left_html)
+class ServerRestartRequestMessage(Message):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+    def html_content(self):
+        return "*{} requested restart".format(html_filter(self.name, color_from_name(self.name)))
+class ServerRestartMessage(Message):
+    def __init__(self):
+        super().__init__()
+    def html_content(self):
+        return "server restart"
 
 def run_server():
     global httpd
@@ -94,12 +112,17 @@ def run_server():
     httpd = GoodServer(server_address, GoodHandler)
     httpd.serve_forever()
 
+# shutdown reasons
+OUR_STDIN_EOF = 0
+SERVER_STDOUT_EOF = 1
+RESTART = 2
+
 def run_read_text():
     for full_line in mcserver.stdout:
         line = full_line.rstrip()
         text_queue.put(line.decode('utf8'))
     else:
-        text_queue.put(None) # shutdown somehow
+        text_queue.put(SERVER_STDOUT_EOF)
 
 def run_input():
     try:
@@ -107,7 +130,7 @@ def run_input():
             line = input()
             put_text(line)
     except EOFError:
-        text_queue.put(None)
+        text_queue.put(OUR_STDIN_EOF)
 
 
 text_queue = queue.Queue()
@@ -115,24 +138,26 @@ text_queue = queue.Queue()
 server_thread = threading.Thread(target=run_server, name="serve")
 server_thread.daemon = True
 
-read_thread = threading.Thread(target=run_read_text, name="read")
-read_thread.daemon = True
-
 input_thread = threading.Thread(target=run_input, name="input")
 input_thread.daemon = True
 
 onliners = set()
 messages = []
+request_restart = False
 
-def user_joined(date, name):
+def user_joined(name):
     onliners.add(name)
-    add_message(JoinLeftMessage(date, name, joined=True))
-def user_left(date, name):
+    add_message(JoinLeftMessage(name, joined=True))
+def user_left(name):
     try:
         onliners.remove(name)
     except KeyError:
         return
-    add_message(JoinLeftMessage(date, name, joined=False))
+    add_message(JoinLeftMessage(name, joined=False))
+    global request_restart
+    if len(onliners) == 0 and request_restart:
+        text_queue.put(RESTART)
+        request_restart = False
 
 def add_message(message):
     messages.append(message)
@@ -153,27 +178,27 @@ def got_text(text):
     if match is not None:
         date = match.group(1)
         name = match.group(2)
-        user_joined(date, name)
+        user_joined(name)
         print("{0} logged in".format(name))
     match = logout_re.match(text)
     if match is not None:
         date = match.group(1)
         name = match.group(2)
-        user_left(date, name)
+        user_left(name)
         print("{0} logged out".format(name))
     match = kicked_float_re.match(text)
     if match is not None:
         date = match.group(1)
         name = match.group(2)
         why = match.group(3)
-        user_left(date, name)
+        user_left(name)
         print("{0} kicked for {1}".format(name, why))
     match = kicked_op_re.match(text)
     if match is not None:
         date = match.group(1)
         kicker = match.group(2)
         name = match.group(3)
-        user_left(date, name)
+        user_left(name)
         print("{0} kicked by {1}".format(name, kicker))
 
     match = chat_re.match(text)
@@ -181,7 +206,7 @@ def got_text(text):
         date = match.group(1)
         name = match.group(2)
         msg = match.group(3)
-        add_message(ChatMessage(date, name, msg))
+        add_message(ChatMessage(name, msg))
 
     match = op_command_re.match(text)
     if match is not None:
@@ -200,42 +225,77 @@ def try_cmd(name, cmd, op=False):
     if cmd == 'list':
         if not op:
             put_text("tell {0} {1}".format(name, ', '.join(onliners)))
+    elif cmd == "restart":
+        global request_restart
+        if request_restart:
+            put_text("tell {} {}".format(name, "restart is already requested"))
+        else:
+            put_text("say {} has requested a server restart once everyone logs off".format(name))
+            add_message(ServerRestartRequestMessage(name))
+            request_restart = True
 
 
 def put_text(text):
     print("[in] {0}".format(text))
-    mcserver.stdin.write(bytes(text+'\n', 'utf8'))
-    mcserver.stdin.flush()
+    try:
+        mcserver.stdin.write(bytes(text+'\n', 'utf8'))
+        mcserver.stdin.flush()
+    except IOError:
+        pass
 
 def main(server_jar_path):
-    global mcserver
-    mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', server_jar_path, 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-
     server_thread.start()
-    read_thread.start()
     input_thread.start()
 
-    # main loop
-    try:
-        while True:
-            line = text_queue.get()
-            if line == None:
-                break # eof
-            got_text(line)
-    except KeyboardInterrupt:
-        pass
-    print("shutting down")
+    restart = True
+    while restart:
+        global mcserver
+        mcserver = subprocess.Popen(['java', '-Xmx1024M', '-Xms1024M', '-jar', server_jar_path, 'nogui'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        read_thread = threading.Thread(target=run_read_text, name="read")
+        read_thread.daemon = True
+        read_thread.start()
+
+        # main loop
+        try:
+            while True:
+                line = text_queue.get()
+                if type(line) != str:
+                    shutdown_reason = line
+                    break
+                got_text(line)
+        except KeyboardInterrupt:
+            shutdown_reason = KeyboardInterrupt
+            pass
+        if shutdown_reason in (KeyboardInterrupt, OUR_STDIN_EOF):
+            print("shutting down")
+            restart = False
+        elif shutdown_reason in (SERVER_STDOUT_EOF, RESTART):
+            print("restarting")
+            add_message(ServerRestartMessage())
+            onliners.clear()
+            restart = True
+        else:
+            raise AssertionError
+        put_text("stop")
+        # wait a little for minecraft to shutdown
+        poll_interval = 0.1
+        max_wait_time = 5
+        for _ in range(int(max_wait_time / poll_interval)):
+            if mcserver.poll() != None:
+                break # done
+            time.sleep(poll_interval)
+        else:
+            # too long to wait. send a ctrl+c in case we didn't already.
+            mcserver.terminate()
+        # flush the input queue so that the shutdown doesn't look like a crash
+        try:
+            while text_queue.get(block=False):
+                pass
+        except queue.Empty:
+            pass
+
     httpd.shutdown()
-    put_text("stop")
-    # wait a little for minecraft to shutdown
-    poll_interval = 0.1
-    for _ in range(int(5 / poll_interval)):
-        if mcserver.poll() != None:
-            break # done
-        time.sleep(poll_interval)
-    else:
-        # too long to wait. send a ctrl+c in case we didn't already.
-        mcserver.terminate()
 
 
 if __name__ == "__main__":
