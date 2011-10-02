@@ -7,7 +7,7 @@ import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import optparse
 
-__version__ = "0.0"
+__version__ = "0.1"
 
 def html_filter(text, color=None):
     text = text.replace('&', '&amp;')
@@ -60,17 +60,36 @@ Content-type: text/html
             self.wfile.write(bytes(message.html(), 'utf8'))
 
         self.wfile.write(bytes("""
+<p><a href="https://github.com/superjoe30/mcserve">mcserve.py</a> version {}</p>
 </body>
 </html>
-""", 'utf8'))
+""".format(__version__), 'utf8'))
 
 gray_color = "#808080"
 def color_from_name(name):
-    name_hash = hash(name)
+    name_hash = hash(name + " [this salt is to make 'thejoshwolfe' and 'superjoe30' different colors]" * 5)
     color = name_hash & 0xa0a0a0
     return "#" + hex(color)[2:].zfill(6)
 def date_header_html(date):
     return html_filter(date.strftime("%Y-%m-%d %H:%M:%S"), gray_color)
+def seconds_to_str(seconds):
+    seconds = int(seconds)
+    minutes = int(seconds / 60)
+    seconds = seconds % 60
+    hours = int(minutes / 60)
+    minutes = minutes % 60
+    days = int(hours / 24)
+    hours = hours % 24
+    if days > 9:
+        return str(days) + " days"
+    if days > 0:
+        return "{} day{} {} hour{}".format(days, ["", "s"][days != 1], hours, ["", "s"][hours != 1])
+    if hours > 0:
+        return str(hours) + "h" + str(minutes).zfill(2) + "m"
+    if minutes > 0:
+        return str(minutes) + "m" + str(seconds).zfill(2) + "s"
+    return str(seconds) + "s"
+
 class Message:
     def __init__(self):
         self.date = datetime.datetime.now()
@@ -88,12 +107,33 @@ class JoinLeftMessage(Message):
         super().__init__()
         self.name = name
         self.joined = joined
+        self.timestamp = time.time()
+        if joined:
+            self.is_quick_return = False
+        self._what_happened_html = ["left", "joined"][joined]
+        # try to find the most recent join/left activity from this person to give more info
+        for other_message in reversed(messages):
+            if not (type(other_message) == JoinLeftMessage and other_message.name == name and other_message.joined != joined):
+                continue
+            how_long_its_been = self.timestamp - other_message.timestamp
+            if joined:
+                if how_long_its_been < 60:
+                    # time spent logged out was too short to count.
+                    # patch the logout message to indicate it was quick.
+                    other_message._what_happened_html = html_filter("logged out briefly", gray_color)
+                    self._what_happened_html = html_filter("logged back in", gray_color)
+                    self.is_quick_return = True
+                else:
+                    self._what_happened_html += html_filter(" (logged off for {})".format(seconds_to_str(how_long_its_been)), gray_color)
+                break
+            else:
+                if other_message.is_quick_return:
+                    # skip quick logouts
+                    continue
+                self._what_happened_html += html_filter(" (logged on for {})".format(seconds_to_str(how_long_its_been)), gray_color)
+                break
     def html_content(self):
-        if self.joined:
-            joined_left_html = "joined"
-        else:
-            joined_left_html = "left"
-        return "*{} {}".format(html_filter(self.name, color_from_name(self.name)), joined_left_html)
+       return "*{} {}".format(html_filter(self.name, color_from_name(self.name)), self._what_happened_html)
 class ServerRestartRequestMessage(Message):
     def __init__(self, name):
         super().__init__()
