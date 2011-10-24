@@ -7,7 +7,7 @@ import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import optparse
 
-__version__ = "0.1"
+__version__ = "0.2"
 
 def html_filter(text, color=None):
     text = text.replace('&', '&amp;')
