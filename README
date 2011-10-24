@@ -4,3 +4,6 @@ Supports minecraft_server.jar version Beta 1.5_02 at least.
 
 Http server defaults to port 9999. Provides an html page that lists online users and recent chat activity.
 
+Usage:
+$ mcserve.py [path-to-minecraft_server.jar]
+

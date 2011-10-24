@@ -339,7 +339,7 @@ def main(server_jar_path):
 
 
 if __name__ == "__main__":
-    parser = optparse.OptionParser(version=__version__)
+    parser = optparse.OptionParser(version=__version__, usage="%prog [minecraft_server.jar]")
     (options, args) = parser.parse_args()
     if len(args) == 0:
         server_jar_path = 'minecraft_server.jar'
