@@ -7,3 +7,5 @@ Http server defaults to port 9999. Provides an html page that lists online users
 Usage:
 $ mcserve.py [path-to-minecraft_server.jar]
 
+Make sure the correct 'java' is on the path.
+
