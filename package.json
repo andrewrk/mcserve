@@ -1,0 +1,20 @@
+{
+  "name": "mcserve",
+  "version": "0.0.4",
+  "description": "serve minecraft with a simple chat logging web interface",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/superjoe30/mcserve.git"
+  },
+  "keywords": [
+    "minecraft",
+    "server"
+  ],
+  "author": "Andrew Kelley",
+  "license": "BSD",
+  "dependencies": {
+    "batch": "~0.2.1",
+    "moment": "~1.7.2",
+    "zfill": "~0.0.1"
+  }
+}
