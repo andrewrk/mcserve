@@ -24,6 +24,11 @@ var restartRequested = false;
 var mcServer = null;
 var httpServer = null;
 var killTimeout = null;
+var lastSeen = {};
+
+function updateLastSeen(name) {
+  lastSeen[name] = new Date();
+}
 
 var lineHandlers = [
   {
@@ -31,6 +36,7 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
+      updateLastSeen(name);
       onUserJoined(name);
       console.info(name, "logged in");
     },
@@ -40,6 +46,7 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
+      updateLastSeen(name);
       onUserLeft(name);
       console.info(name, "logged out");
     },
@@ -50,6 +57,7 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var why = match[3];
+      updateLastSeen(name);
       console.info(name, "kicked for", why);
     },
   },
@@ -59,6 +67,7 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var msg = match[3];
+      updateLastSeen(name);
       if (/^\#/.test(msg)) {
         // server command
         tryCmd(name, msg.substring(1));
@@ -74,6 +83,7 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
+      updateLastSeen(name);
       addMessage(new DeathMessage(name, "slain by " + killer));
     },
   },
@@ -82,6 +92,7 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
+      updateLastSeen(name);
       addMessage(new DeathMessage(name, "drowned"));
     },
   },
@@ -90,19 +101,29 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
+      updateLastSeen(name);
       addMessage(new DeathMessage(name, "hit the ground too hard"));
     },
   },
 ];
 
 var cmdHandlers = {
-  restart: function(name) {
+  restart: function(cmdUser) {
     if (restartRequested) {
-      mcPut("tell " + name + " restart is already requested");
+      mcPut("say restart is already requested");
     } else {
-      mcPut("say " + name + " has requested a server restart once everyone logs off");
-      addMessage(new ServerRestartRequestMessage(name));
+      mcPut("say " + cmdUser + " has requested a server restart once everyone logs off");
+      addMessage(new ServerRestartRequestMessage(cmdUser));
       restartRequested = true;
+    }
+  },
+  seen: function(cmdUser, args) {
+    var name = args[0];
+    var date = lastSeen[name];
+    if (date) {
+      mcPut("say " + name + " was last seen " + moment(date).fromNow());
+    } else {
+      mcPut("say " + name + " has never been seen.");
     }
   },
 };
@@ -246,9 +267,10 @@ function mcPut(cmd) {
 
 function tryCmd(name, cmd) {
   console.info("try cmd '" + name + "' '" + cmd + "'");
-  fn = cmdHandlers[cmd];
+  var words = cmd.split(/\s+/);
+  var fn = cmdHandlers[words[0]];
   if (fn) {
-    fn(name);
+    fn(name, words.slice(1));
   } else {
     console.info("no such command:", cmd);
   }
