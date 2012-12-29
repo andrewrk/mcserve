@@ -256,7 +256,7 @@ function killMc() {
 function onMcLine(line) {
   var handler, match;
   for (var i = 0; i < lineHandlers.length; ++i) {
-    handler = lineHandlers[0];
+    handler = lineHandlers[i];
     match = line.match(handler.re);
     if (match) {
       handler.fn(match);
