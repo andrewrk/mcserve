@@ -165,6 +165,7 @@ function restartMcServer() {
   onliners = {};
   restartRequested = false;
   clearTimeout(killTimeout);
+  startMcServer();
 }
 
 function startMcServer() {
@@ -251,7 +252,7 @@ function onMcLine(line) {
       return;
     }
   }
-  console.info("Unrecognized mc line:", line);
+  console.info("[MC]", line);
 }
 
 function main() {
