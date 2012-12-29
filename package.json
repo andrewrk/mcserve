@@ -1,6 +1,6 @@
 {
   "name": "mcserve",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "serve minecraft with a simple chat logging web interface",
   "repository": {
     "type": "git",
