@@ -277,7 +277,7 @@ function Message() {
 }
 
 Message.prototype.html = function() {
-  return dateHeaderHtml(this.date) + " " + this.htmlContent();
+  return dateHeaderHtml(this.date) + " " + this.htmlContent() + "<br>";
 }
 
 function ChatMessage(name, msg) {
