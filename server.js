@@ -59,29 +59,19 @@ var lineHandlers = [
       date = match[1];
       name = match[2];
       msg = match[3];
-      addMessage(new ChatMessage(name, msg));
-    },
-  },
-  {
-    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) issued server command\: (.+)$/),
-    fn: function(match) {
-      name = match[2];
-      cmd = match[3];
-      tryCmd(name, cmd, true);
-    },
-  },
-  {
-    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) tried command\: (.+)$/),
-    fn: function(match) {
-      name = match[2];
-      cmd = match[3];
-      tryCmd(name, cmd, false);
+      if (/^\#/.test(msg)) {
+        // server command
+        tryCmd(name, msg.substring(1));
+      } else {
+        // chat
+        addMessage(new ChatMessage(name, msg));
+      }
     },
   },
 ];
 
 var cmdHandlers = {
-  restart: function(name, op) {
+  restart: function(name) {
     if (restartRequested) {
       mcPut("tell " + name + " restart is already requested");
     } else {
@@ -223,12 +213,11 @@ function mcPut(cmd) {
 }
 
 
-function tryCmd(name, cmd, op) {
-  op = op == null ? false : op;
+function tryCmd(name, cmd) {
   console.info("try cmd '" + name + "' '" + cmd + "'");
   fn = cmdHandlers[cmd];
   if (fn) {
-    fn(name, op);
+    fn(name);
   } else {
     console.info("no such command:", cmd);
   }
