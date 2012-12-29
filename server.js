@@ -115,7 +115,6 @@ function colorFromName(name) {
 
 function startServer() {
   httpServer = http.createServer(function(req, resp) {
-    console.info("got GET request");
     resp.statusCode = 200;
     resp.write(
       "<!doctype html>" +
