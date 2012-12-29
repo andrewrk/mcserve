@@ -149,7 +149,7 @@ function startReadingInput() {
     rl.prompt();
   });
   rl.on('close', onClose);
-  rl.on('SIGINT', onClose);
+  process.on('SIGINT', onClose);
   rl.prompt();
 
   function onClose() {
