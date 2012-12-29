@@ -29,8 +29,8 @@ var lineHandlers = [
   {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+)\[\/(\d+\.\d+.\d+.\d+:\d+)\] logged in with entity id (\d+?) at \(.+?\)$/),
     fn: function(match) {
-      date = match[1];
-      name = match[2];
+      var date = match[1];
+      var name = match[2];
       onUserJoined(name);
       console.info(name, "logged in");
     },
@@ -38,8 +38,8 @@ var lineHandlers = [
   {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) lost connection: (.+)$/),
     fn: function(match) {
-      date = match[1];
-      name = match[2];
+      var date = match[1];
+      var name = match[2];
       onUserLeft(name);
       console.info(name, "logged out");
     },
@@ -47,18 +47,18 @@ var lineHandlers = [
   {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] Kicked (.+?) from the game: '(.+?)'$/),
     fn: function(match) {
-      date = match[1];
-      name = match[2];
-      why = match[3];
+      var date = match[1];
+      var name = match[2];
+      var why = match[3];
       console.info(name, "kicked for", why);
     },
   },
   {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] <(.+?)> (.+)$/),
     fn: function(match) {
-      date = match[1];
-      name = match[2];
-      msg = match[3];
+      var date = match[1];
+      var name = match[2];
+      var msg = match[3];
       if (/^\#/.test(msg)) {
         // server command
         tryCmd(name, msg.substring(1));
@@ -66,6 +66,31 @@ var lineHandlers = [
         // chat
         addMessage(new ChatMessage(name, msg));
       }
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was slain by (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      addMessage(new DeathMessage(name, "slain by " + killer));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) drowned$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      addMessage(new DeathMessage(name, "drowned"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) hit the ground too hard$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      addMessage(new DeathMessage(name, "hit the ground too hard"));
     },
   },
 ];
@@ -318,7 +343,7 @@ function JoinLeftMessage(name, joined) {
 util.inherits(JoinLeftMessage, Message);
 
 JoinLeftMessage.prototype.htmlContent = function() {
-  return "*" + htmlFilter(this.name, colorFromName(this.name)) + " " + this._whatHappenedHtml;
+  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " " + this._whatHappenedHtml;
 };
 
 function ServerRestartRequestMessage(name) {
@@ -329,7 +354,7 @@ function ServerRestartRequestMessage(name) {
 util.inherits(ServerRestartRequestMessage, Message);
 
 ServerRestartRequestMessage.prototype.htmlContent = function() {
-  return "*" + htmlFilter(this.name, colorFromName(this.name)) + " requested restart";
+  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " requested restart";
 };
 
 function ServerRestartMessage() {
@@ -339,4 +364,15 @@ util.inherits(ServerRestartMessage, Message);
 
 ServerRestartMessage.prototype.htmlContent = function() {
   return "server restart";
+};
+
+function DeathMessage(name, cause) {
+  Message.call(this);
+  this.name = name;
+  this.cause = cause;
+}
+util.inherits(DeathMessage, Message);
+
+DeathMessage.prototype.htmlContent = function() {
+  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " died: " + this.cause;
 };
