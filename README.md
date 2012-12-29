@@ -5,9 +5,14 @@ node.js http server and console wrapper for minecraft server.
 ## Features
 
  * Web interface with recent chat history and who is online.
- * Ability for users to request a server restart with `#restart` which
-   will happen after everybody logs off.
  * Automatically restart minecraft server when it crashes.
+ * Provide extra commands to users
+
+### Extra Commands for Users
+
+ * `#restart`: Requests a server restart which will happen after everybody
+   logs off.
+ * `#seen <username>`: Tells how long ago username was seen on the server.
 
 ## Installation
 
