@@ -317,7 +317,7 @@ function JoinLeftMessage(name, joined) {
   var i, otherMsg, howLongItsBeen;
   for (i = messages.length - 1; i >= 0; --i) {
     otherMsg = messages[i];
-    if (! (otherMsg.isJoinMessage && otherMsg.name === name && otherMsg.joined !== joined)) continue;
+    if (! (otherMsg.isJoinLeftMessage && otherMsg.name === name && otherMsg.joined !== joined)) continue;
     howLongItsBeen = this.timestamp - otherMsg.timestamp;
     if (joined) {
       if (howLongItsBeen < 60000) {
@@ -345,6 +345,8 @@ util.inherits(JoinLeftMessage, Message);
 JoinLeftMessage.prototype.htmlContent = function() {
   return "* " + htmlFilter(this.name, colorFromName(this.name)) + " " + this._whatHappenedHtml;
 };
+
+JoinLeftMessage.prototype.isJoinLeftMessage = true;
 
 function ServerRestartRequestMessage(name) {
   Message.call(this);
