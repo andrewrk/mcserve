@@ -167,7 +167,12 @@ function startServer() {
       resp.write("<h2>Online players:</h2><ul>");
       for (onliner in onliners) {
         joinDate = onliners[onliner];
-        resp.write("<li>" + htmlFilter(onliner, colorFromName(onliner)) + ", joined " + moment(joinDate).fromNow() + "</li>");
+        resp.write("<li>" +
+          htmlFilter(onliner, colorFromName(onliner)) +
+          ", joined " +
+          moment(joinDate).fromNow() +
+          ", last seen " + moment(lastSeen[onliner]).fromNow() +
+          "</li>");
       }
       resp.write("</ul>");
     }
