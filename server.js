@@ -174,13 +174,18 @@ function startReadingInput() {
     rl.prompt();
   });
   rl.on('close', onClose);
-  process.on('SIGINT', onClose);
+  process.once('SIGINT', onClose);
   rl.prompt();
 
   function onClose() {
     mcServer.removeListener('exit', restartMcServer);
     httpServer.close();
     rl.close();
+    // if minecraft takes longer than 5 seconds to stop, kill it
+    killTimeout = setTimeout(killMc, 5000);
+    mcServer.once('exit', function() {
+      clearTimeout(killTimeout);
+    });
     mcPut("stop");
   }
 }
