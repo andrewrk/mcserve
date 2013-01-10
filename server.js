@@ -88,6 +88,36 @@ var lineHandlers = [
     },
   },
   {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was shot by (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "shot by " + killer));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was fireballed by (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "fireballed by " + killer));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was killed by (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "killed by " + killer));
+    },
+  },
+  {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) drowned$/),
     fn: function(match) {
       var date = match[1];
@@ -103,6 +133,134 @@ var lineHandlers = [
       var name = match[2];
       updateLastSeen(name);
       addMessage(new DeathMessage(name, "hit the ground too hard"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) fell out of the world$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "fell out of the world"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) tried to swim in lava$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "tried to swim in lava"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) went up in flames$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "went up in flames"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) burned to death$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "burned to death"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) blew up$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "blew up"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was killed by magic$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "was killed by magic"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) suffocated in a wall$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "suffocated in a wall"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was pricked to death$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "was pricked to death"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) starved to death$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "starved to death"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) died$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "died"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) withered away$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "withered away"));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was killed while trying to hurt (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "was killed while trying to hurt " + killer));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was pummeled by (.+)$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      var killer = match[3];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "was pummeled by " + killer));
+    },
+  },
+  {
+    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+?) was squashed by a falling anvil$/),
+    fn: function(match) {
+      var date = match[1];
+      var name = match[2];
+      updateLastSeen(name);
+      addMessage(new DeathMessage(name, "was squashed by a falling anvil"));
     },
   },
 ];
