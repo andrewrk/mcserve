@@ -9,10 +9,14 @@ var spawn = require('child_process').spawn
   , zfill = require('zfill')
   , moment = require('moment')
   , packageJson = require('./package.json')
+  , superagent = require('superagent')
 
 var env = {
   PORT: process.env.PORT || 9999,
   HOST: process.env.HOST || '0.0.0.0',
+  BOT_SERVER_ENDPOINT: process.env.BOT_SERVER_ENDPOINT || 'http://localhost:11476',
+  MC_PORT: process.env.MC_PORT || 25565,
+  API_KEY: process.env.API_KEY || '43959b30-6cd8-11e2-bcfd-0800200c9a66',
 };
 
 var GRAY_COLOR = "#808080";
@@ -284,6 +288,25 @@ var cmdHandlers = {
       mcPut("say " + name + " has never been seen.");
     }
   },
+  bot: function(cmdUser, args) {
+    var type = args[0];
+    var botName = args[1];
+    if (type === 'list' && ! botName) {
+      listBotTypes(function(err, types) {
+        if (err) {
+          console.error(err.stack);
+          mcPut("Error getting bot type list.");
+        } else {
+          mcPut("say Bot types: " + types.join(" "));
+        }
+      });
+    } else if (! type || ! botName) {
+      mcPut("say Usage: bot <type> <username>");
+      mcPut("say `bot list` for a list of bot types.");
+    } else {
+      requestNewBot(cmdUser, type, botName);
+    }
+  },
 };
 
 main();
@@ -343,7 +366,7 @@ function startServer() {
     resp.write("<p><a href=\"https://github.com/superjoe30/mcserve\">mcserve</a> version " + packageJson.version + "</p></body></html>");
     resp.end();
   });
-  httpServer.listen(env.PORT, env.HOST, function() {
+  httpServer.listen(env.PORT, function() {
     console.info("Listening at http://" + env.HOST + ":" + env.PORT);
   });
 }
@@ -470,6 +493,40 @@ function onMcLine(line) {
   console.info("[MC]", line);
 }
 
+function listBotTypes(cb) {
+  var request = superagent.get(env.BOT_SERVER_ENDPOINT + "/list");
+  request.end(function(err, resp) {
+    if (err) {
+      cb(err);
+    } else if (! resp.ok) {
+      cb(new Error(resp.status + " " + resp.text));
+    } else {
+      cb(null, resp.body);
+    }
+  });
+}
+
+function requestNewBot(owner, type, botName) {
+  var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/create");
+  request.send({
+    type: type,
+    apiKey: env.API_KEY,
+    port: env.MC_PORT,
+    host: env.HOST,
+    username: botName,
+    owner: owner,
+  });
+  request.end(function(err, resp) {
+    if (err) {
+      console.error("Error creating bot:", err.stack);
+    } else if (! resp.ok) {
+      console.error("Error creating bot.", resp.status, resp.text);
+    } else {
+      addMessage(new BotRequestMessage(owner, type, botName));
+    }
+  });
+}
+
 function main() {
   startServer();
   startReadingInput();
@@ -567,4 +624,16 @@ util.inherits(DeathMessage, Message);
 
 DeathMessage.prototype.htmlContent = function() {
   return "* " + htmlFilter(this.name, colorFromName(this.name)) + " died: " + this.cause;
+};
+
+function BotRequestMessage(owner, type, botName) {
+  this.name = owner;
+  this.type = type;
+  this.botName = botName;
+  Message.call(this);
+}
+util.inherits(BotRequestMessage, Message);
+
+BotRequestMessage.prototype.htmlContent = function() {
+  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " created a '" + this.type + "' bot named '" + this.botName + "'.";
 };

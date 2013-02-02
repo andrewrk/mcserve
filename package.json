@@ -15,6 +15,7 @@
   "dependencies": {
     "batch": "~0.2.1",
     "moment": "~1.7.2",
-    "zfill": "~0.0.1"
+    "zfill": "~0.0.1",
+    "superagent": "~0.12.1"
   }
 }
