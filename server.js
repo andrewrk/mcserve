@@ -313,7 +313,7 @@ var cmdHandlers = {
       showHelp();
     }
     function showHelp() {
-      mcPut("say Usage: bot <type> <username>");
+      mcPut("say Usage: bot create <type> <username>");
       mcPut("say `bot list` for a list of bot types.");
     }
   },
