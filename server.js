@@ -289,22 +289,32 @@ var cmdHandlers = {
     }
   },
   bot: function(cmdUser, args) {
-    var type = args[0];
-    var botName = args[1];
-    if (type === 'list' && ! botName) {
+    var cmd = args[0];
+    var type = args[1];
+    var botName = args[2];
+    if (cmd === 'list') {
       listBotTypes(function(err, types) {
         if (err) {
           console.error(err.stack);
-          mcPut("Error getting bot type list.");
+          mcPut("say Error getting bot type list.");
         } else {
           mcPut("say Bot types: " + types.join(" "));
         }
       });
-    } else if (! type || ! botName) {
+    } else if (cmd === 'create') {
+      if (type && botName) {
+        requestNewBot(cmdUser, type, botName, function(err) {
+          if (err) mcPut("say Error creating bot.");
+        });
+      } else {
+        showHelp();
+      }
+    } else {
+      showHelp();
+    }
+    function showHelp() {
       mcPut("say Usage: bot <type> <username>");
       mcPut("say `bot list` for a list of bot types.");
-    } else {
-      requestNewBot(cmdUser, type, botName);
     }
   },
 };
@@ -506,7 +516,7 @@ function listBotTypes(cb) {
   });
 }
 
-function requestNewBot(owner, type, botName) {
+function requestNewBot(owner, type, botName, cb) {
   var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/create");
   request.send({
     type: type,
@@ -519,10 +529,13 @@ function requestNewBot(owner, type, botName) {
   request.end(function(err, resp) {
     if (err) {
       console.error("Error creating bot:", err.stack);
+      cb(err);
     } else if (! resp.ok) {
       console.error("Error creating bot.", resp.status, resp.text);
+      cb(new Error("http " + resp.status + " " + resp.text));
     } else {
       addMessage(new BotRequestMessage(owner, type, botName));
+      cb();
     }
   });
 }
