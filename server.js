@@ -705,7 +705,7 @@ function BotDestroyMessage(bot) {
 util.inherits(BotDestroyMessage, Message);
 
 BotDestroyMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.bot.owner, colorFromName(this.bot.owner)) + " destroyed bot '" + this.bot.name + "'.";
+  return "* " + htmlFilter(this.bot.owner, colorFromName(this.bot.owner)) + " destroyed bot '" + htmlFilter(this.bot.name) + "'.";
 };
 
 function BotRequestMessage(owner, type, botName) {
@@ -717,5 +717,7 @@ function BotRequestMessage(owner, type, botName) {
 util.inherits(BotRequestMessage, Message);
 
 BotRequestMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " created a '" + this.type + "' bot named '" + this.botName + "'.";
+  return "* " + htmlFilter(this.name, colorFromName(this.name)) +
+    " created a '" + htmlFilter(this.type) + "' bot named '" +
+    htmlFilter(this.botName) + "'.";
 };
