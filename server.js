@@ -30,6 +30,8 @@ var httpServer = null;
 var killTimeout = null;
 var lastSeen = {};
 
+var bots = {};
+
 function updateLastSeen(name) {
   lastSeen[name] = new Date();
 }
@@ -62,6 +64,7 @@ var lineHandlers = [
       var name = match[2];
       var why = match[3];
       updateLastSeen(name);
+      onUserLeft(name);
       console.info(name, "kicked for", why);
     },
   },
@@ -290,8 +293,7 @@ var cmdHandlers = {
   },
   bot: function(cmdUser, args) {
     var cmd = args[0];
-    var type = args[1];
-    var botName = args[2];
+    var type, botName;
     if (cmd === 'list') {
       listBotTypes(function(err, types) {
         if (err) {
@@ -302,10 +304,44 @@ var cmdHandlers = {
         }
       });
     } else if (cmd === 'create') {
+      type = args[1];
+      botName = args[2];
       if (type && botName) {
-        requestNewBot(cmdUser, type, botName, function(err) {
-          if (err) mcPut("say Error creating bot.");
+        requestNewBot(cmdUser, type, botName, function(err, id) {
+          if (err) {
+            mcPut("say Error creating bot.");
+          } else {
+            bots[botName] = {
+              owner: cmdUser,
+              id: id,
+              name: botName,
+            };
+          }
         });
+      } else {
+        showHelp();
+      }
+    } else if (cmd === 'tp') {
+      botName = args[1];
+      if (botName) {
+        if (bots[botName] && bots[botName].owner === cmdUser) {
+          mcPut("tp " + botName + " " + cmdUser);
+        } else {
+          mcPut("say that's not your bot");
+        }
+      } else {
+        showHelp();
+      }
+    } else if (cmd === 'destroy') {
+      botName = args[1];
+      if (botName) {
+        if (bots[botName] && bots[botName].owner === cmdUser) {
+          requestDestroyBot(bots[botName], function(err) {
+            if (err) mcPut("say Error destroying bot.");
+          });
+        } else {
+          mcPut("say that's not your bot");
+        }
       } else {
         showHelp();
       }
@@ -313,8 +349,10 @@ var cmdHandlers = {
       showHelp();
     }
     function showHelp() {
-      mcPut("say Usage: bot create <type> <username>");
-      mcPut("say `bot list` for a list of bot types.");
+      mcPut("say `bot create <type> <username>` to start a new bot");
+      mcPut("say `bot list` for a list of bot types");
+      mcPut("say `bot tp <botname>` to teleport your bot to you");
+      mcPut("say `bot destroy <botname>` to destroy your bot");
     }
   },
 };
@@ -474,6 +512,7 @@ function tryCmd(name, cmd) {
 
 function onUserLeft(name) {
   delete onliners[name];
+  delete bots[name];
   addMessage(new JoinLeftMessage(name, false));
   checkRestart();
 }
@@ -516,6 +555,26 @@ function listBotTypes(cb) {
   });
 }
 
+function requestDestroyBot(bot, cb) {
+  var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/destroy");
+  request.send({
+    apiKey: env.API_KEY,
+    id: bot.id,
+  });
+  request.end(function(err, resp) {
+    if (err) {
+      console.error("Error destroying bot", err.stack);
+      cb(err);
+    } else if (! resp.ok) {
+      console.error("Error destroying bot", resp.status, resp.text);
+      cb(new Error("http " + resp.status + " " + resp.text));
+    } else {
+      addMessage(new BotDestroyMessage(bot));
+      cb();
+    }
+  });
+}
+
 function requestNewBot(owner, type, botName, cb) {
   var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/create");
   request.send({
@@ -535,7 +594,7 @@ function requestNewBot(owner, type, botName, cb) {
       cb(new Error("http " + resp.status + " " + resp.text));
     } else {
       addMessage(new BotRequestMessage(owner, type, botName));
-      cb();
+      cb(null, resp.text);
     }
   });
 }
@@ -637,6 +696,16 @@ util.inherits(DeathMessage, Message);
 
 DeathMessage.prototype.htmlContent = function() {
   return "* " + htmlFilter(this.name, colorFromName(this.name)) + " died: " + this.cause;
+};
+
+function BotDestroyMessage(bot) {
+  this.bot = bot;
+  Message.call(this);
+}
+util.inherits(BotDestroyMessage, Message);
+
+BotDestroyMessage.prototype.htmlContent = function() {
+  return "* " + htmlFilter(this.bot.owner, colorFromName(this.bot.owner)) + " destroyed bot '" + this.bot.name + "'.";
 };
 
 function BotRequestMessage(owner, type, botName) {
