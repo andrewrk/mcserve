@@ -311,6 +311,7 @@ var cmdHandlers = {
           if (err) {
             mcPut("say Error creating bot.");
           } else {
+            addMessage(new BotRequestMessage(cmdUser, type, botName));
             bots[botName] = {
               owner: cmdUser,
               id: id,
@@ -337,7 +338,12 @@ var cmdHandlers = {
       if (botName) {
         if (bots[botName] && bots[botName].owner === cmdUser) {
           requestDestroyBot(bots[botName], function(err) {
-            if (err) mcPut("say Error destroying bot.");
+            if (err) {
+              mcPut("say Error destroying bot.");
+            } else {
+              mcPut("kick " + botName + " destroyed bot");
+              addMessage(new BotDestroyMessage(bots[botName]));
+            }
           });
         } else {
           mcPut("say that's not your bot");
@@ -569,7 +575,6 @@ function requestDestroyBot(bot, cb) {
       console.error("Error destroying bot", resp.status, resp.text);
       cb(new Error("http " + resp.status + " " + resp.text));
     } else {
-      addMessage(new BotDestroyMessage(bot));
       cb();
     }
   });
@@ -593,7 +598,6 @@ function requestNewBot(owner, type, botName, cb) {
       console.error("Error creating bot.", resp.status, resp.text);
       cb(new Error("http " + resp.status + " " + resp.text));
     } else {
-      addMessage(new BotRequestMessage(owner, type, botName));
       cb(null, resp.text);
     }
   });
