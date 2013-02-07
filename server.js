@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-var spawn = require('child_process').spawn
+var childProcess = require('child_process')
   , readline = require('readline')
+  , path = require('path')
   , http = require('http')
   , Batch = require('batch')
   , util = require('util')
@@ -16,7 +17,7 @@ var env = {
   HOST: process.env.HOST || '0.0.0.0',
   BOT_SERVER_ENDPOINT: process.env.BOT_SERVER_ENDPOINT || 'http://localhost:11476',
   MC_PORT: process.env.MC_PORT || 25565,
-  API_KEY: process.env.API_KEY || '43959b30-6cd8-11e2-bcfd-0800200c9a66',
+  BOT_SERVER_API_KEY: process.env.BOT_SERVER_API_KEY || '43959b30-6cd8-11e2-bcfd-0800200c9a66',
 };
 
 var GRAY_COLOR = "#808080";
@@ -26,6 +27,7 @@ var onliners = {};
 var messages = [];
 var restartRequested = false;
 var mcServer = null;
+var mcProxy = null;
 var httpServer = null;
 var killTimeout = null;
 var lastSeen = {};
@@ -440,6 +442,7 @@ function startReadingInput() {
 
   function onClose() {
     mcServer.removeListener('exit', restartMcServer);
+    mcProxy.removeListener('exit', restartMcProxy);
     httpServer.close();
     rl.close();
     // if minecraft takes longer than 5 seconds to stop, kill it
@@ -448,6 +451,7 @@ function startReadingInput() {
       clearTimeout(killTimeout);
     });
     mcPut("stop");
+    mcProxy.kill();
   }
 }
 
@@ -459,8 +463,23 @@ function restartMcServer() {
   startMcServer();
 }
 
+function restartMcProxy() {
+  addMessage(new ProxyCrashedMessage());
+  startMcProxy();
+}
+
+function startMcProxy() {
+  mcProxy = childProcess.fork(path.join(__dirname, 'lib', 'proxy.js'));
+  mcProxy.on('message', function(msg) {
+    if (msg.type === 'mcPut') {
+      mcPut(msg.cmd);
+    }
+  });
+  mcProxy.on('exit', restartMcProxy);
+}
+
 function startMcServer() {
-  mcServer = spawn('java', ['-Xmx1024M', '-Xms1024M', '-jar', SERVER_JAR_PATH, 'nogui'], {
+  mcServer = childProcess.spawn('java', ['-Xmx1024M', '-Xms1024M', '-jar', SERVER_JAR_PATH, 'nogui'], {
     stdio: 'pipe',
   });
   var buffer = "";
@@ -526,6 +545,7 @@ function onUserLeft(name) {
 function checkRestart() {
   if (restartRequested && serverEmpty()) {
     mcPut("stop");
+    mcProxy.kill();
     // if minecraft takes longer than 5 seconds to restart, kill it
     killTimeout = setTimeout(killMc, 5000);
   }
@@ -564,7 +584,7 @@ function listBotTypes(cb) {
 function requestDestroyBot(bot, cb) {
   var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/destroy");
   request.send({
-    apiKey: env.API_KEY,
+    apiKey: env.BOT_SERVER_API_KEY,
     id: bot.id,
   });
   request.end(function(err, resp) {
@@ -584,7 +604,7 @@ function requestNewBot(owner, type, botName, cb) {
   var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/create");
   request.send({
     type: type,
-    apiKey: env.API_KEY,
+    apiKey: env.BOT_SERVER_API_KEY,
     port: env.MC_PORT,
     host: env.HOST,
     username: botName,
@@ -607,6 +627,7 @@ function main() {
   startServer();
   startReadingInput();
   startMcServer();
+  startMcProxy();
 }
 
 function Message() {
@@ -689,6 +710,15 @@ util.inherits(ServerRestartMessage, Message);
 
 ServerRestartMessage.prototype.htmlContent = function() {
   return "server restart";
+};
+
+function ProxyCrashedMessage() {
+  Message.call(this);
+}
+util.inherits(ProxyCrashedMessage, Message);
+
+ProxyCrashedMessage.prototype.htmlContent = function() {
+  return "proxy restart";
 };
 
 function DeathMessage(name, cause) {
