@@ -8,6 +8,9 @@
   "kickTimeout": null,
   "motd": "A Minecraft Server",
   "max-players": 20,
+  "admins": {
+    "superjoe": true
+  },
   "onlineModeExceptions": {
     "notch": true
   }
