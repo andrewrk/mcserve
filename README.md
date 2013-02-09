@@ -20,6 +20,8 @@ Console wrapper and proxy for Minecraft 1.4.7 server.
  * `/bot` - create, destroy, list, tp bots on a
    [mc-bot-server](https://github.com/superjoe30/mc-bot-server)
  * `/version` - get the mcserve version
+ * `/whitelist` - manage who is on the whitelist (or blacklist)
+ * `/admin` - manage who has access to admin commands
 
 ## Installation
 
