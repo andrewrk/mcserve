@@ -11,11 +11,12 @@ Console wrapper and proxy for Minecraft 1.4.7 server.
 
 ### Extra Commands for Users
 
- * `#restart`: Requests a server restart which will happen after everybody
+ * `/restart`: Requests a server restart which will happen after everybody
    logs off.
- * `#seen <username>`: Tells how long ago username was seen on the server.
- * `#bot` - create, destroy, list, tp bots on a
+ * `/seen <username>`: Tells how long ago username was seen on the server.
+ * `/bot` - create, destroy, list, tp bots on a
    [mc-bot-server](https://github.com/superjoe30/mc-bot-server)
+ * `/version` - get the mcserve version
 
 ## Installation
 
@@ -25,17 +26,37 @@ Console wrapper and proxy for Minecraft 1.4.7 server.
 4. Set `online-mode` to false in `server.properties`. Authentication and
    encryption is handled by this project.
 5. `npm install mcserve`
-6. Figure out and set your configuration environment variables (see below).
-7. `npm start mcserve`
+6. Copy `mcserve.json.example` to your minecraft server folder and rename it to
+   `mcserve.json`.
+7. Change any configuration that you need to (see below)
+8. `npm start mcserve`
 
-## Configuration Environment Variables
+### mcserve.json
 
- * `PORT` - port the web interface listens on. Defaults to `9999`
- * `HOST` - host the web interface listens on. Defaults to `0.0.0.0`
- * `BOT_SERVER_ENDPOINT` - a running
+ * `proxyPort` - port that the proxy listens on
+ * `proxyHost` - host that the proxy binds to
+ * `proxyRemoteHost` - the hostname that the bot server should connect bots to
+ * `webPort` - the port that the web interface listens on
+ * `webHost` - the host that the web interface binds to
+ * `minecraftPort` - the port that the real minecraft server will listen on.
+   Make sure this is the same as the `server-port` property in minecraft's
+   `server.properties` file.
+ * `minecraftHost` - the host that the real minecraft server will listen on.
+   Make sure this is the same as the `server-ip` property in minecraft.'s
+   `server.properties` file.
+ * `online-mode` - whether you want the proxy to authenticate usernames with
+   the official server. you can set exceptions with `onlineModeExceptions`.
+   No matter what you choose, you must set `online-mode` to `false` in
+   minecraft's `server.properties`.
+ * `onlineModeExceptions` - in online mode, this is usernames which are not
+   checked. in offline mode, this is usernames which are checked.
+ * `encryption` - whether to turn on protocol encryption
+ * `kickTimeout` - how many milliseconds to wait before kicking a client
+   which is failing to send heartbeat messages
+ * `motd` - little blurb that is displayed in the server list
+ * `max-players` - limit number of people who can connect to the proxy
+ * `admins` - these people can add and remove people from `onlineModeExceptions`
+ * `botServerEndpoint` - URL to a running
    [mc-bot-server](https://github.com/superjoe30/mc-bot-server) which players
    can use to spawn bots.
- * `BOT_SERVER_API_KEY`: the api key that you need to give to mc-bot-server
- * `MC_PORT`: port that minecraft server is listening on. this should be the
-   same as `server-port` in `server.properties`.
-
+ * `botServerApiKey` - the api key that you need to give to mc-bot-server

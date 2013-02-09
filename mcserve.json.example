@@ -2,6 +2,8 @@
   "proxyPort": 25565,
   "proxyHost": "0.0.0.0",
   "proxyRemoteHost": "localhost",
+  "webPort": 9999,
+  "webHost": "0.0.0.0",
   "minecraftPort": 25566,
   "minecraftHost": "127.0.0.1",
   "online-mode": false,

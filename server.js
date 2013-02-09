@@ -9,19 +9,14 @@ var childProcess = require('child_process')
   , zfill = require('zfill')
   , moment = require('moment')
   , packageJson = require('./package.json')
+  , settings = require(path.join(process.cwd(), 'mcserve.json'))
   , assert = require('assert')
-
-var env = {
-  PORT: process.env.PORT || 9999,
-  HOST: process.env.HOST || '0.0.0.0',
-};
 
 var GRAY_COLOR = "#808080";
 var SERVER_JAR_PATH = 'minecraft_server.jar';
 
 var onliners = {};
 var messages = [];
-var restartRequested = false;
 var mcServer = null;
 var mcProxy = null;
 var httpServer = null;
@@ -320,8 +315,8 @@ function startServer() {
     resp.write("<p><a href=\"https://github.com/superjoe30/mcserve\">mcserve</a> version " + packageJson.version + "</p></body></html>");
     resp.end();
   });
-  httpServer.listen(env.PORT, env.HOST, function() {
-    console.info("Listening at http://" + env.HOST + ":" + env.PORT);
+  httpServer.listen(settings.webPort, settings.webHost, function() {
+    console.info("Listening at http://" + settings.webHost + ":" + settings.webPort);
   });
 }
 
@@ -356,7 +351,6 @@ function startReadingInput() {
 function restartMcServer() {
   addMessage(new ServerRestartMessage());
   onliners = {};
-  restartRequested = false;
   clearTimeout(killTimeout);
   startMcServer();
 }
@@ -369,7 +363,6 @@ function restartMcProxy() {
 var msgHandlers = {
   requestRestart: function(username) {
     addMessage(new ServerRestartRequestMessage(username));
-    restartRequested = true;
   },
   botCreate: function(msg) {
     addMessage(new BotRequestMessage(msg.username, msg.type, msg.botName));
@@ -380,6 +373,15 @@ var msgHandlers = {
   destroyBot: function(msg) {
     mcPut("kick " + msg.botName + " destroyed bot");
     addMessage(new BotDestroyMessage(msg.username, msg.botName));
+  },
+  autoDestroyBot: function(botName) {
+    addMessage(new BotDestroyMessage("[server]", botName));
+  },
+  restart: function() {
+    mcPut("stop");
+    mcProxy.kill();
+    // if minecraft takes longer than 5 seconds to restart, kill it
+    killTimeout = setTimeout(killMc, 5000);
   },
 };
 
@@ -442,16 +444,6 @@ function mcPut(cmd) {
 function onUserLeft(name) {
   delete onliners[name];
   addMessage(new JoinLeftMessage(name, false));
-  checkRestart();
-}
-
-function checkRestart() {
-  if (restartRequested && serverEmpty()) {
-    mcPut("stop");
-    mcProxy.kill();
-    // if minecraft takes longer than 5 seconds to restart, kill it
-    killTimeout = setTimeout(killMc, 5000);
-  }
 }
 
 function killMc() {
