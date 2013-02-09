@@ -4,20 +4,16 @@ var childProcess = require('child_process')
   , readline = require('readline')
   , path = require('path')
   , http = require('http')
-  , Batch = require('batch')
   , util = require('util')
   , crypto = require('crypto')
   , zfill = require('zfill')
   , moment = require('moment')
   , packageJson = require('./package.json')
-  , superagent = require('superagent')
+  , assert = require('assert')
 
 var env = {
   PORT: process.env.PORT || 9999,
   HOST: process.env.HOST || '0.0.0.0',
-  BOT_SERVER_ENDPOINT: process.env.BOT_SERVER_ENDPOINT || 'http://localhost:11476',
-  MC_PORT: process.env.MC_PORT || 25565,
-  BOT_SERVER_API_KEY: process.env.BOT_SERVER_API_KEY || '43959b30-6cd8-11e2-bcfd-0800200c9a66',
 };
 
 var GRAY_COLOR = "#808080";
@@ -31,8 +27,6 @@ var mcProxy = null;
 var httpServer = null;
 var killTimeout = null;
 var lastSeen = {};
-
-var bots = {};
 
 function updateLastSeen(name) {
   lastSeen[name] = new Date();
@@ -77,13 +71,8 @@ var lineHandlers = [
       var name = match[2];
       var msg = match[3];
       updateLastSeen(name);
-      if (/^\#/.test(msg)) {
-        // server command
-        tryCmd(name, msg.substring(1));
-      } else {
-        // chat
-        addMessage(new ChatMessage(name, msg));
-      }
+      // chat
+      addMessage(new ChatMessage(name, msg));
     },
   },
   {
@@ -274,97 +263,6 @@ var lineHandlers = [
   },
 ];
 
-var cmdHandlers = {
-  restart: function(cmdUser) {
-    if (restartRequested) {
-      mcPut("say restart is already requested");
-    } else {
-      mcPut("say " + cmdUser + " has requested a server restart once everyone logs off");
-      addMessage(new ServerRestartRequestMessage(cmdUser));
-      restartRequested = true;
-    }
-  },
-  seen: function(cmdUser, args) {
-    var name = args[0];
-    var date = lastSeen[name];
-    if (date) {
-      mcPut("say " + name + " was last seen " + moment(date).fromNow());
-    } else {
-      mcPut("say " + name + " has never been seen.");
-    }
-  },
-  bot: function(cmdUser, args) {
-    var cmd = args[0];
-    var type, botName;
-    if (cmd === 'list') {
-      listBotTypes(function(err, types) {
-        if (err) {
-          console.error(err.stack);
-          mcPut("say Error getting bot type list.");
-        } else {
-          mcPut("say Bot types: " + types.join(" "));
-        }
-      });
-    } else if (cmd === 'create') {
-      type = args[1];
-      botName = args[2];
-      if (type && botName) {
-        requestNewBot(cmdUser, type, botName, function(err, id) {
-          if (err) {
-            mcPut("say Error creating bot.");
-          } else {
-            addMessage(new BotRequestMessage(cmdUser, type, botName));
-            bots[botName] = {
-              owner: cmdUser,
-              id: id,
-              name: botName,
-            };
-          }
-        });
-      } else {
-        showHelp();
-      }
-    } else if (cmd === 'tp') {
-      botName = args[1];
-      if (botName) {
-        if (bots[botName] && bots[botName].owner === cmdUser) {
-          mcPut("tp " + botName + " " + cmdUser);
-        } else {
-          mcPut("say that's not your bot");
-        }
-      } else {
-        showHelp();
-      }
-    } else if (cmd === 'destroy') {
-      botName = args[1];
-      if (botName) {
-        if (bots[botName] && bots[botName].owner === cmdUser) {
-          requestDestroyBot(bots[botName], function(err) {
-            if (err) {
-              mcPut("say Error destroying bot.");
-            } else {
-              mcPut("kick " + botName + " destroyed bot");
-              addMessage(new BotDestroyMessage(bots[botName]));
-            }
-          });
-        } else {
-          mcPut("say that's not your bot");
-        }
-      } else {
-        showHelp();
-      }
-    } else {
-      showHelp();
-    }
-    function showHelp() {
-      mcPut("say `bot create <type> <username>` to start a new bot");
-      mcPut("say `bot list` for a list of bot types");
-      mcPut("say `bot tp <botname>` to teleport your bot to you");
-      mcPut("say `bot destroy <botname>` to destroy your bot");
-    }
-  },
-};
-
 main();
 
 function htmlFilter(text, color) {
@@ -422,7 +320,7 @@ function startServer() {
     resp.write("<p><a href=\"https://github.com/superjoe30/mcserve\">mcserve</a> version " + packageJson.version + "</p></body></html>");
     resp.end();
   });
-  httpServer.listen(env.PORT, function() {
+  httpServer.listen(env.PORT, env.HOST, function() {
     console.info("Listening at http://" + env.HOST + ":" + env.PORT);
   });
 }
@@ -468,12 +366,29 @@ function restartMcProxy() {
   startMcProxy();
 }
 
+var msgHandlers = {
+  requestRestart: function(username) {
+    addMessage(new ServerRestartRequestMessage(username));
+    restartRequested = true;
+  },
+  botCreate: function(msg) {
+    addMessage(new BotRequestMessage(msg.username, msg.type, msg.botName));
+  },
+  tp: function(msg) {
+    mcPut("tp " + msg.fromUsername + " " + msg.toUsername);
+  },
+  destroyBot: function(msg) {
+    mcPut("kick " + msg.botName + " destroyed bot");
+    addMessage(new BotDestroyMessage(msg.username, msg.botName));
+  },
+};
+
 function startMcProxy() {
   mcProxy = childProcess.fork(path.join(__dirname, 'lib', 'proxy.js'));
   mcProxy.on('message', function(msg) {
-    if (msg.type === 'mcPut') {
-      mcPut(msg.cmd);
-    }
+    var handler = msgHandlers[msg.type];
+    assert.ok(handler);
+    handler(msg.value);
   });
   mcProxy.on('exit', restartMcProxy);
 }
@@ -524,20 +439,8 @@ function mcPut(cmd) {
 }
 
 
-function tryCmd(name, cmd) {
-  console.info("try cmd '" + name + "' '" + cmd + "'");
-  var words = cmd.split(/\s+/);
-  var fn = cmdHandlers[words[0]];
-  if (fn) {
-    fn(name, words.slice(1));
-  } else {
-    console.info("no such command:", cmd);
-  }
-}
-
 function onUserLeft(name) {
   delete onliners[name];
-  delete bots[name];
   addMessage(new JoinLeftMessage(name, false));
   checkRestart();
 }
@@ -568,60 +471,6 @@ function onMcLine(line) {
   console.info("[MC]", line);
 }
 
-function listBotTypes(cb) {
-  var request = superagent.get(env.BOT_SERVER_ENDPOINT + "/list");
-  request.end(function(err, resp) {
-    if (err) {
-      cb(err);
-    } else if (! resp.ok) {
-      cb(new Error(resp.status + " " + resp.text));
-    } else {
-      cb(null, resp.body);
-    }
-  });
-}
-
-function requestDestroyBot(bot, cb) {
-  var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/destroy");
-  request.send({
-    apiKey: env.BOT_SERVER_API_KEY,
-    id: bot.id,
-  });
-  request.end(function(err, resp) {
-    if (err) {
-      console.error("Error destroying bot", err.stack);
-      cb(err);
-    } else if (! resp.ok) {
-      console.error("Error destroying bot", resp.status, resp.text);
-      cb(new Error("http " + resp.status + " " + resp.text));
-    } else {
-      cb();
-    }
-  });
-}
-
-function requestNewBot(owner, type, botName, cb) {
-  var request = superagent.post(env.BOT_SERVER_ENDPOINT + "/create");
-  request.send({
-    type: type,
-    apiKey: env.BOT_SERVER_API_KEY,
-    port: env.MC_PORT,
-    host: env.HOST,
-    username: botName,
-    owner: owner,
-  });
-  request.end(function(err, resp) {
-    if (err) {
-      console.error("Error creating bot:", err.stack);
-      cb(err);
-    } else if (! resp.ok) {
-      console.error("Error creating bot.", resp.status, resp.text);
-      cb(new Error("http " + resp.status + " " + resp.text));
-    } else {
-      cb(null, resp.text);
-    }
-  });
-}
 
 function main() {
   startServer();
@@ -732,14 +581,15 @@ DeathMessage.prototype.htmlContent = function() {
   return "* " + htmlFilter(this.name, colorFromName(this.name)) + " died: " + this.cause;
 };
 
-function BotDestroyMessage(bot) {
-  this.bot = bot;
+function BotDestroyMessage(username, botName) {
+  this.username = username;
+  this.botName = botName;
   Message.call(this);
 }
 util.inherits(BotDestroyMessage, Message);
 
 BotDestroyMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.bot.owner, colorFromName(this.bot.owner)) + " destroyed bot '" + htmlFilter(this.bot.name) + "'.";
+  return "* " + htmlFilter(this.username, colorFromName(this.username)) + " destroyed bot '" + htmlFilter(this.botName) + "'.";
 };
 
 function BotRequestMessage(owner, type, botName) {

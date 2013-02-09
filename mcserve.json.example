@@ -1,6 +1,7 @@
 {
   "proxyPort": 25565,
   "proxyHost": "0.0.0.0",
+  "proxyRemoteHost": "localhost",
   "minecraftPort": 25566,
   "minecraftHost": "127.0.0.1",
   "online-mode": false,
@@ -13,5 +14,7 @@
   },
   "onlineModeExceptions": {
     "notch": true
-  }
+  },
+  "botServerEndpoint": "http://localhost:11476",
+  "botServerApiKey": "43959b30-6cd8-11e2-bcfd-0800200c9a66"
 }
