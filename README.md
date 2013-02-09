@@ -1,5 +1,7 @@
 # mcserve
 
+(Pronounced "mick surv")
+
 Console wrapper and proxy for Minecraft 1.4.7 server.
 
 ## Features
@@ -11,6 +13,7 @@ Console wrapper and proxy for Minecraft 1.4.7 server.
 
 ### Extra Commands for Users
 
+ * `/help mcserve` - in game help for mcserve commands
  * `/restart`: Requests a server restart which will happen after everybody
    logs off.
  * `/seen <username>`: Tells how long ago username was seen on the server.
