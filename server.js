@@ -23,18 +23,12 @@ var httpServer = null;
 var killTimeout = null;
 var lastSeen = {};
 
-function updateLastSeen(name) {
-  lastSeen[name] = new Date();
-}
-
 var lineHandlers = [
   {
     re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] (.+)\[\/(\d+\.\d+.\d+.\d+:\d+)\] logged in with entity id (\d+?) at \(.+?\)$/),
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
-      onUserJoined(name);
       console.info(name, "logged in");
     },
   },
@@ -43,8 +37,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
-      onUserLeft(name);
       console.info(name, "logged out");
     },
   },
@@ -54,8 +46,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var why = match[3];
-      updateLastSeen(name);
-      onUserLeft(name);
       console.info(name, "kicked for", why);
     },
   },
@@ -65,7 +55,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var msg = match[3];
-      updateLastSeen(name);
       // chat
       addMessage(new ChatMessage(name, msg));
     },
@@ -76,7 +65,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "slain by " + killer));
     },
   },
@@ -86,7 +74,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "shot by " + killer));
     },
   },
@@ -96,7 +83,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "fireballed by " + killer));
     },
   },
@@ -106,7 +92,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "killed by " + killer));
     },
   },
@@ -115,7 +100,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "drowned"));
     },
   },
@@ -124,7 +108,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "hit the ground too hard"));
     },
   },
@@ -133,7 +116,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "fell out of the world"));
     },
   },
@@ -142,7 +124,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "tried to swim in lava"));
     },
   },
@@ -151,7 +132,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "went up in flames"));
     },
   },
@@ -160,7 +140,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "burned to death"));
     },
   },
@@ -169,7 +148,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "blew up"));
     },
   },
@@ -178,7 +156,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "was killed by magic"));
     },
   },
@@ -187,7 +164,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "suffocated in a wall"));
     },
   },
@@ -196,7 +172,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "was pricked to death"));
     },
   },
@@ -205,7 +180,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "starved to death"));
     },
   },
@@ -214,7 +188,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "died"));
     },
   },
@@ -223,7 +196,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "withered away"));
     },
   },
@@ -233,7 +205,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "was killed while trying to hurt " + killer));
     },
   },
@@ -243,7 +214,6 @@ var lineHandlers = [
       var date = match[1];
       var name = match[2];
       var killer = match[3];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "was pummeled by " + killer));
     },
   },
@@ -252,7 +222,6 @@ var lineHandlers = [
     fn: function(match) {
       var date = match[1];
       var name = match[2];
-      updateLastSeen(name);
       addMessage(new DeathMessage(name, "was squashed by a falling anvil"));
     },
   },
@@ -383,6 +352,17 @@ var msgHandlers = {
     // if minecraft takes longer than 5 seconds to restart, kill it
     killTimeout = setTimeout(killMc, 5000);
   },
+  userJoin: function(username) {
+    onliners[username] = new Date();
+    addMessage(new JoinLeftMessage(username, true));
+  },
+  userLeave: function(username) {
+    delete onliners[username];
+    addMessage(new JoinLeftMessage(username, false));
+  },
+  userActivity: function(username) {
+    lastSeen[username] = new Date();
+  },
 };
 
 function startMcProxy() {
@@ -424,11 +404,6 @@ function addMessage(msg) {
   }
 }
 
-function onUserJoined(name) {
-  onliners[name] = new Date();
-  addMessage(new JoinLeftMessage(name, true));
-}
-
 function serverEmpty() {
   for (var onliner in onliners) {
     return false;
@@ -440,11 +415,6 @@ function mcPut(cmd) {
   mcServer.stdin.write(cmd + "\n");
 }
 
-
-function onUserLeft(name) {
-  delete onliners[name];
-  addMessage(new JoinLeftMessage(name, false));
-}
 
 function killMc() {
   mcServer.kill();
