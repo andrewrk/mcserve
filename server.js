@@ -23,18 +23,7 @@ var httpServer = null;
 var killTimeout = null;
 var lastSeen = {};
 
-var lineHandlers = [
-  {
-    re: new RegExp(/^(\d+\-\d+\-\d+ \d+\:\d+\:\d+) \[INFO\] <(.+?)> (.+)$/),
-    fn: function(match) {
-      var date = match[1];
-      var name = match[2];
-      var msg = match[3];
-      // chat
-      addMessage(new ChatMessage(name, msg));
-    },
-  },
-];
+var lineHandlers = [];
 
 main();
 
@@ -174,6 +163,9 @@ var msgHandlers = {
   },
   userDeath: function(username) {
     addMessage(new DeathMessage(username));
+  },
+  userChat: function(msg) {
+    addMessage(new ChatMessage(msg.username, msg.msg));
   },
 };
 
