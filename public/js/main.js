@@ -10,6 +10,11 @@
     };
   });
 
+  main.filter('timestamp', function(){
+    return function(date){
+      return moment(date).format("YYYY-MM-DD HH:mm:ss");
+    };
+  });
 
   main.controller('MainCtrl', ['$scope'].concat(function($scope){
     var msgHandlers = {
@@ -20,6 +25,44 @@
     var eventHandlers = {
       userJoin: onUserJoin,
       userLeave: onUserLeave,
+      userActivity: onUserActivity,
+    };
+
+    var eventRenderers = {
+      userChat: function(msg) {
+        return "<" + msg.username + "> " + msg.msg;
+      },
+      userJoin: function(username) {
+        return "* " + username + " joined";
+      },
+      userLeave: function(username) {
+        return "* " + username + " left";
+      },
+      serverRestart: function() {
+        return "* server restart";
+      },
+      proxyRestart: function() {
+        return "* proxy restart";
+      },
+      requestRestart: function(username) {
+        return "* requested restart";
+      },
+      botCreate: function(msg) {
+        return "* " + msg.username + " created a '" +
+          msg.type + "' bot named '" + msg.botName + "'";
+      },
+      destroyBot: function(msg) {
+        return "* " + msg.username + " destroyed bot '" + msg.botName + "'";
+      },
+      autoDestroyBot: function(botName) {
+        return "! bot '" + botName + "' automatically destroyed";
+      },
+      tp: function(msg) {
+        return "* " + msg.fromUsername + " was teleported to " + msg.toUsername;
+      },
+      userDeath: function(username) {
+        return "* " + username + " died";
+      },
     };
 
     var source = new EventSource("/events");
@@ -37,7 +80,7 @@
     }
 
     function onError(e){
-      $scope.connectionStatus = "error";
+      $scope.connectionStatus = "disconnected";
       $scope.$apply();
     }
 
@@ -45,12 +88,22 @@
       $scope.onliners = msg.onliners;
       $scope.lastSeen = msg.lastSeen;
       $scope.eventHistory = msg.eventHistory;
+      $scope.version = msg.version;
+      scrollBottom();
     }
 
     function onEvent(event) {
       var handler = eventHandlers[event.type];
       if (handler && handler(event.value) === true) return;
       $scope.eventHistory.push(event);
+      scrollBottom();
+    }
+
+    function scrollBottom() {
+      setTimeout(function() {
+        var elem = document.getElementById('history');
+        elem.scrollTop = elem.scrollHeight;
+      }, 10);
     }
 
     function onUserJoin(username) {
@@ -62,11 +115,25 @@
       delete $scope.onliners[username];
     }
 
+    function onUserActivity(username) {
+      $scope.lastSeen[username] = new Date();
+      return true;
+    }
+
     $scope.serverEmpty = function() {
       for (var username in $scope.onliners) {
         return false;
       }
       return true;
+    };
+
+    $scope.eventHtml = function(event) {
+      var renderEvent = eventRenderers[event.type];
+      if (renderEvent) {
+        return renderEvent(event.value);
+      } else {
+        return event.type;
+      }
     };
   }));
 

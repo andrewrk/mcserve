@@ -37,11 +37,14 @@ main();
 function emitEvent(type, value) {
   var event = {
     type: type,
+    date: new Date(),
     value: value,
   };
-  eventHistory.push(event);
-  while (eventHistory.length > EVENT_HISTORY_COUNT) {
-    eventHistory.shift();
+  if (event.type !== 'userActivity') {
+    eventHistory.push(event);
+    while (eventHistory.length > EVENT_HISTORY_COUNT) {
+      eventHistory.shift();
+    }
   }
   bus.emit('event', event);
 }
@@ -72,6 +75,7 @@ function httpGetEvents(req, resp) {
       onliners: onliners,
       lastSeen: lastSeen,
       eventHistory: eventHistory,
+      version: packageJson.version,
     },
   });
   busOn("event", function(event){

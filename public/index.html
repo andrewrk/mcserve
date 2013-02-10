@@ -2,11 +2,12 @@
 <html ng-app="main">
   <head>
     <title>Minecraft Server Status</title>
+    <link rel="stylesheet" href="/css/main.css">
   </head>
   <body ng-controller="MainCtrl">
-    <p>Connection status: {{ connectionStatus }}</p>
+    <p ng-show="connectionStatus != 'connected'">connection status: {{ connectionStatus }}</p>
+    <h2>Online Players</h2>
     <div ng-hide="serverEmpty()">
-      <h2>Online Players</h2>
       <ul>
         <li ng-repeat="(player, joinDate) in onliners">
         {{ player }}, joined {{ joinDate | ago }}, last seen {{ lastSeen[player] | ago }}
@@ -16,6 +17,13 @@
     <div ng-show="serverEmpty()">
       <p>Nobody online.</p>
     </div>
+    <h2>History</h2>
+    <div id="history">
+      <div ng-repeat="event in eventHistory">
+        <span class="date">{{ event.date | timestamp }}</span> {{ eventHtml(event) }}
+      </div>
+    </div>
+    <p><a href="https://github.com/superjoe30/mcserve">mcserve</a> version {{ version }}</p>
     <script src="/vendor/moment-2.0.0.min.js"></script>
     <script src="/vendor/angular-1.0.4.min.js"></script>
     <script src="/js/main.js"></script>

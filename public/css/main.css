@@ -1,0 +1,9 @@
+#history {
+  overflow-y: auto;
+  max-height: 400px;
+  max-width: 1000px;
+}
+
+span.date {
+  color: #808080;
+}
