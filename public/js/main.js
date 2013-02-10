@@ -89,6 +89,10 @@
       $scope.lastSeen = msg.lastSeen;
       $scope.eventHistory = msg.eventHistory;
       $scope.version = msg.version;
+      $scope.activity = {};
+      for (var player in $scope.onliners) {
+        $scope.activity[player] = 0;
+      }
       scrollBottom();
     }
 
@@ -117,6 +121,8 @@
 
     function onUserActivity(username) {
       $scope.lastSeen[username] = new Date();
+      $scope.activity[username] = $scope.activity[username] == null ? 1 :
+        $scope.activity[username] + 1;
       return true;
     }
 

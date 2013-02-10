@@ -10,7 +10,8 @@
     <div ng-hide="serverEmpty()">
       <ul>
         <li ng-repeat="(player, joinDate) in onliners">
-        {{ player }}, joined {{ joinDate | ago }}, last seen {{ lastSeen[player] | ago }}
+        {{ player }}, joined {{ joinDate | ago }}, last seen {{ lastSeen[player] | ago }},
+        {{ activity[player] }} activities
         </li>
       </ul>
     </div>
