@@ -1,0 +1,23 @@
+<!doctype html>
+<html ng-app="main">
+  <head>
+    <title>Minecraft Server Status</title>
+  </head>
+  <body ng-controller="MainCtrl">
+    <p>Connection status: {{ connectionStatus }}</p>
+    <div ng-hide="serverEmpty()">
+      <h2>Online Players</h2>
+      <ul>
+        <li ng-repeat="(player, joinDate) in onliners">
+        {{ player }}, joined {{ joinDate | ago }}, last seen {{ lastSeen[player] | ago }}
+        </li>
+      </ul>
+    </div>
+    <div ng-show="serverEmpty()">
+      <p>Nobody online.</p>
+    </div>
+    <script src="/vendor/moment-2.0.0.min.js"></script>
+    <script src="/vendor/angular-1.0.4.min.js"></script>
+    <script src="/js/main.js"></script>
+  </body>
+</html>

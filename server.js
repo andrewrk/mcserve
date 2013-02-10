@@ -11,12 +11,19 @@ var childProcess = require('child_process')
   , packageJson = require('./package.json')
   , settings = require(path.join(process.cwd(), 'mcserve.json'))
   , assert = require('assert')
+  , express = require('express')
+  , sse = require('connect-sse')()
+  , cors = require('connect-xcors')()
+  , noCache = require('connect-nocache')()
+  , EventEmitter = require('events').EventEmitter
 
-var GRAY_COLOR = "#808080";
 var SERVER_JAR_PATH = 'minecraft_server.jar';
+var EVENT_HISTORY_COUNT = 100;
 
 var onliners = {};
-var messages = [];
+var eventHistory = [];
+var bus = new EventEmitter();
+bus.setMaxListeners(0);
 var mcServer = null;
 var mcProxy = null;
 var httpServer = null;
@@ -27,63 +34,51 @@ var lineHandlers = [];
 
 main();
 
-function htmlFilter(text, color) {
-  text = text.replace(/&/g, '&amp;');
-  text = text.replace(/"/g, '&quot;');
-  text = text.replace(/</g, '&lt;');
-  text = text.replace(/>/g, '&gt;');
-  if (color) text = "<span style=\"color:" + color + "\">" + text + "</span>";
-  return text;
-}
-
-function dateHeaderHtml(date) {
-  return htmlFilter(moment(date).format("YYYY-MM-DD HH:mm:ss"), GRAY_COLOR);
-}
-
-function colorFromName(name) {
-  var nameHash = parseInt(crypto.createHash('md5').update(name).digest('hex'), 16);
-  var color = nameHash & 0xa0a0a0;
-  return "#" + zfill(color.toString(16), 6);
+function emitEvent(type, value) {
+  var event = {
+    type: type,
+    value: value,
+  };
+  eventHistory.push(event);
+  while (eventHistory.length > EVENT_HISTORY_COUNT) {
+    eventHistory.shift();
+  }
+  bus.emit('event', event);
 }
 
 function startServer() {
-  httpServer = http.createServer(function(req, resp) {
-    resp.statusCode = 200;
-    resp.write(
-      "<!doctype html>" +
-      "<html>" +
-      "<head>" +
-      "<title>MineCraft Server Status</title>" +
-      "</head>" +
-      "<body>"
-    );
-    var onliner, joinDate;
-    if (serverEmpty()) {
-      resp.write("<p>Nobody is online :-(</p>");
-    } else {
-      resp.write("<h2>Online players:</h2><ul>");
-      for (onliner in onliners) {
-        joinDate = onliners[onliner];
-        resp.write("<li>" +
-          htmlFilter(onliner, colorFromName(onliner)) +
-          ", joined " +
-          moment(joinDate).fromNow() +
-          ", last seen " + moment(lastSeen[onliner]).fromNow() +
-          "</li>");
-      }
-      resp.write("</ul>");
-    }
-    resp.write("<h2>latest gibberish</h2>");
-    var i, msg;
-    for (i = messages.length - 1; i >= 0; --i) {
-      msg = messages[i];
-      resp.write(msg.html());
-    }
-    resp.write("<p><a href=\"https://github.com/superjoe30/mcserve\">mcserve</a> version " + packageJson.version + "</p></body></html>");
-    resp.end();
-  });
+  var app = express();
+  app.use(noCache);
+  app.use(app.router);
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.get('/events', [sse, cors], httpGetEvents);
+  httpServer = http.createServer(app);
   httpServer.listen(settings.webPort, settings.webHost, function() {
     console.info("Listening at http://" + settings.webHost + ":" + settings.webPort);
+  });
+}
+
+function httpGetEvents(req, resp) {
+  resp.setMaxListeners(0);
+  function busOn(event, cb){
+    bus.on(event, cb);
+    resp.on('close', function(){
+      bus.removeListener(event, cb);
+    });
+  }
+  resp.json({
+    type: "history",
+    value: {
+      onliners: onliners,
+      lastSeen: lastSeen,
+      eventHistory: eventHistory,
+    },
+  });
+  busOn("event", function(event){
+    resp.json({
+      type: "event",
+      value: event,
+    });
   });
 }
 
@@ -116,33 +111,34 @@ function startReadingInput() {
 }
 
 function restartMcServer() {
-  addMessage(new ServerRestartMessage());
+  emitEvent('serverRestart');
   onliners = {};
   clearTimeout(killTimeout);
   startMcServer();
 }
 
 function restartMcProxy() {
-  addMessage(new ProxyCrashedMessage());
+  emitEvent('proxyRestart');
   startMcProxy();
 }
 
 var msgHandlers = {
   requestRestart: function(username) {
-    addMessage(new ServerRestartRequestMessage(username));
+    emitEvent('requestRestart', username);
   },
   botCreate: function(msg) {
-    addMessage(new BotRequestMessage(msg.username, msg.type, msg.botName));
+    emitEvent('botCreate', msg);
   },
   tp: function(msg) {
     mcPut("tp " + msg.fromUsername + " " + msg.toUsername);
+    emitEvent('tp', msg);
   },
   destroyBot: function(msg) {
     mcPut("kick " + msg.botName + " destroyed bot");
-    addMessage(new BotDestroyMessage(msg.username, msg.botName));
+    emitEvent('destroyBot', msg);
   },
   autoDestroyBot: function(botName) {
-    addMessage(new BotDestroyMessage("[server]", botName));
+    emitEvent('autoDestroyBot', botName);
   },
   restart: function() {
     mcPut("stop");
@@ -152,20 +148,21 @@ var msgHandlers = {
   },
   userJoin: function(username) {
     onliners[username] = new Date();
-    addMessage(new JoinLeftMessage(username, true));
+    emitEvent('userJoin', username);
   },
   userLeave: function(username) {
     delete onliners[username];
-    addMessage(new JoinLeftMessage(username, false));
+    emitEvent('userLeave', username);
   },
   userActivity: function(username) {
     lastSeen[username] = new Date();
+    emitEvent('userActivity', username);
   },
   userDeath: function(username) {
-    addMessage(new DeathMessage(username));
+    emitEvent('userDeath', username);
   },
   userChat: function(msg) {
-    addMessage(new ChatMessage(msg.username, msg.msg));
+    emitEvent('userChat', msg);
   },
 };
 
@@ -199,13 +196,6 @@ function startMcServer() {
     buffer = lines[lines.length - 1];
   }
   mcServer.on('exit', restartMcServer);
-}
-
-function addMessage(msg) {
-  messages.push(msg);
-  while (messages.length > 100) {
-    messages.shift();
-  }
 }
 
 function serverEmpty() {
@@ -245,128 +235,3 @@ function main() {
   startMcProxy();
 }
 
-function Message() {
-  this.date = new Date();
-}
-
-Message.prototype.html = function() {
-  return dateHeaderHtml(this.date) + " " + this.htmlContent() + "<br>";
-}
-
-function ChatMessage(name, msg) {
-  Message.call(this);
-  this.name = name
-  this.msg = msg
-}
-util.inherits(ChatMessage, Message);
-
-ChatMessage.prototype.htmlContent = function() {
-  return "&lt;" + htmlFilter(this.name, colorFromName(this.name)) + "&gt; " + htmlFilter(this.msg);
-}
-
-function JoinLeftMessage(name, joined) {
-  Message.call(this);
-  joined = joined == null ? true : joined;
-  this.name = name;
-  this.joined = joined;
-  this.timestamp = new Date();
-  if (joined) this.isQuickReturn = false;
-  this._whatHappenedHtml = joined ? "joined" : "left";
-  // try to find the most recent join/left activity from this person to give more info
-  var i, otherMsg, howLongItsBeen;
-  for (i = messages.length - 1; i >= 0; --i) {
-    otherMsg = messages[i];
-    if (! (otherMsg.isJoinLeftMessage && otherMsg.name === name && otherMsg.joined !== joined)) continue;
-    howLongItsBeen = this.timestamp - otherMsg.timestamp;
-    if (joined) {
-      if (howLongItsBeen < 60000) {
-        // time spent logged out was too short to count.
-        // patch the logout message to indicate it was quick.
-        otherMsg._whatHappenedHtml = htmlFilter("logged out briefly", GRAY_COLOR);
-        this._whatHappenedHtml = htmlFilter("logged back in", GRAY_COLOR);
-        this.isQuickReturn = true;
-      } else {
-        this._whatHappenedHtml += htmlFilter(" (logged off for " + moment.duration(howLongItsBeen).humanize() + ")", GRAY_COLOR);
-      }
-      break;
-    } else {
-      if (otherMsg.isQuickReturn) {
-        // skip quick logouts
-        continue;
-      }
-      this._whatHappenedHtml += htmlFilter(" (logged on for " + moment.duration(howLongItsBeen).humanize() + ")", GRAY_COLOR);
-      break;
-    }
-  }
-}
-util.inherits(JoinLeftMessage, Message);
-
-JoinLeftMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " " + this._whatHappenedHtml;
-};
-
-JoinLeftMessage.prototype.isJoinLeftMessage = true;
-
-function ServerRestartRequestMessage(name) {
-  Message.call(this);
-  this.name = name;
-}
-
-util.inherits(ServerRestartRequestMessage, Message);
-
-ServerRestartRequestMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " requested restart";
-};
-
-function ServerRestartMessage() {
-  Message.call(this);
-}
-util.inherits(ServerRestartMessage, Message);
-
-ServerRestartMessage.prototype.htmlContent = function() {
-  return "server restart";
-};
-
-function ProxyCrashedMessage() {
-  Message.call(this);
-}
-util.inherits(ProxyCrashedMessage, Message);
-
-ProxyCrashedMessage.prototype.htmlContent = function() {
-  return "proxy restart";
-};
-
-function DeathMessage(name) {
-  Message.call(this);
-  this.name = name;
-}
-util.inherits(DeathMessage, Message);
-
-DeathMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.name, colorFromName(this.name)) + " died.";
-};
-
-function BotDestroyMessage(username, botName) {
-  this.username = username;
-  this.botName = botName;
-  Message.call(this);
-}
-util.inherits(BotDestroyMessage, Message);
-
-BotDestroyMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.username, colorFromName(this.username)) + " destroyed bot '" + htmlFilter(this.botName) + "'.";
-};
-
-function BotRequestMessage(owner, type, botName) {
-  this.name = owner;
-  this.type = type;
-  this.botName = botName;
-  Message.call(this);
-}
-util.inherits(BotRequestMessage, Message);
-
-BotRequestMessage.prototype.htmlContent = function() {
-  return "* " + htmlFilter(this.name, colorFromName(this.name)) +
-    " created a '" + htmlFilter(this.type) + "' bot named '" +
-    htmlFilter(this.botName) + "'.";
-};
