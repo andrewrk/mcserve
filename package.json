@@ -14,7 +14,7 @@
   "license": "BSD",
   "dependencies": {
     "superagent": "~0.12.1",
-    "minecraft-protocol": "~0.7.7",
+    "minecraft-protocol": "~0.7.8",
     "express": "~3.1.0",
     "connect-sse": "~1.0.4",
     "connect-xcors": "~0.5.2",
