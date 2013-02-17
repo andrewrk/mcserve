@@ -45,7 +45,7 @@
         return "* proxy restart";
       },
       requestRestart: function(username) {
-        return "* requested restart";
+        return "* " + username + " requested restart";
       },
       botCreate: function(msg) {
         return "* " + msg.username + " created a '" +
