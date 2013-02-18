@@ -32,6 +32,9 @@
       userChat: function(msg) {
         return "<" + msg.username + "> " + msg.msg;
       },
+      userChatAction: function(msg) {
+        return "** " + msg.username + " " + msg.msg;
+      },
       userJoin: function(username) {
         return "* " + username + " joined";
       },

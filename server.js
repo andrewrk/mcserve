@@ -164,6 +164,9 @@ var msgHandlers = {
   userChat: function(msg) {
     emitEvent('userChat', msg);
   },
+  userChatAction: function(msg) {
+    emitEvent('userChatAction', msg);
+  },
 };
 
 function startMcProxy() {
