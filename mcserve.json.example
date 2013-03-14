@@ -1,4 +1,5 @@
 {
+  "disableProxy": false,
   "proxyPort": 25565,
   "proxyHost": "0.0.0.0",
   "proxyRemoteHost": "localhost",

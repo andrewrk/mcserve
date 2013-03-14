@@ -38,6 +38,7 @@ Console wrapper and proxy for Minecraft 1.5 server.
 
 ### mcserve.json
 
+ * `disableProxy` - set to `true` to skip starting the proxy server
  * `proxyPort` - port that the proxy listens on
  * `proxyHost` - host that the proxy binds to
  * `proxyRemoteHost` - the hostname that the bot server should connect bots to

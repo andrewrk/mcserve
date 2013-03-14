@@ -97,7 +97,7 @@ function startReadingInput() {
 
   function onClose() {
     mcServer.removeListener('exit', restartMcServer);
-    mcProxy.removeListener('exit', restartMcProxy);
+    if (mcProxy) mcProxy.removeListener('exit', restartMcProxy);
     httpServer.close();
     rl.close();
     // if minecraft takes longer than 5 seconds to stop, kill it
@@ -106,7 +106,7 @@ function startReadingInput() {
       clearTimeout(killTimeout);
     });
     mcPut("stop");
-    mcProxy.kill();
+    if (mcProxy) mcProxy.kill();
   }
 }
 
@@ -142,7 +142,7 @@ var msgHandlers = {
   },
   restart: function() {
     mcPut("stop");
-    mcProxy.kill();
+    if (mcProxy) mcProxy.kill();
     // if minecraft takes longer than 5 seconds to restart, kill it
     killTimeout = setTimeout(killMc, 5000);
   },
@@ -235,6 +235,6 @@ function main() {
   startServer();
   startReadingInput();
   startMcServer();
-  startMcProxy();
+  if (!settings.disableProxy) startMcProxy();
 }
 
