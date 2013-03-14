@@ -2,7 +2,7 @@
 
 (Pronounced "mick surv")
 
-Console wrapper and proxy for Minecraft 1.4.7 server.
+Console wrapper and proxy for Minecraft 1.5 server.
 
 ## Features
 
