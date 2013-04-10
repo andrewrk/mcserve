@@ -13,10 +13,10 @@
   "author": "Andrew Kelley",
   "license": "BSD",
   "dependencies": {
-    "superagent": "~0.12.1",
-    "minecraft-protocol": "~0.7.9",
-    "express": "~3.1.0",
-    "connect-sse": "~1.0.4",
+    "superagent": "~0.14.1",
+    "minecraft-protocol": "~0.9.0",
+    "express": "~3.1.1",
+    "connect-sse": "~1.0.5",
     "connect-xcors": "~0.5.2",
     "connect-nocache": "~1.0.1",
     "moment": "~2.0.0"
